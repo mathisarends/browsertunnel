@@ -4,11 +4,18 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from backend.application import BrowserTunnel
+
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Starting up BrowserTunnel API")
-    yield
-    logger.info("Shutting down BrowserTunnel API")
+    container = app.state.dishka_container
+    await container.get(BrowserTunnel)
+    try:
+        yield
+    finally:
+        logger.info("Shutting down BrowserTunnel API")
+        await container.close()

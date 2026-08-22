@@ -16,6 +16,9 @@ uv run pre-commit install
 ## Development
 
 ```bash
+# Backend starten (startet Chromium im Lifespan)
+uv run python -m backend.main
+
 # Frontend starten (installiert fehlende Pakete automatisch)
 sh scripts/start-frontend.sh
 
@@ -35,3 +38,39 @@ Vite leitet im Entwicklungsmodus alle Aufrufe unter `/api` an das separat
 laufende Backend auf Port 8000 weiter. Der Einstiegspunkt für den späteren
 Framecast-Renderer ist `drawFrame()` in `frontend/src/main.ts`; für API-Aufrufe
 steht `getJson()` in `frontend/src/api.ts` bereit.
+
+## Backend-Protokoll
+
+Der POC hat genau einen fachlichen WebSocket-Router. Alle Client-Befehle laufen
+als JSON-RPC 2.0 über:
+
+- WebSocket: `ws://127.0.0.1:8000/api/browser/ws`
+- vollständiges JSON Schema: `/api/browser/schema.json`
+- OpenRPC für Client-Generierung: `/api/browser/openrpc.json`
+
+Beispiel:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "browser.navigate",
+  "params": {"url": "https://example.com"}
+}
+```
+
+Screencast-Frames und Tab-Zustand sendet der Server als JSON-RPC-Notification
+`browser.event`; `params.type` ist `browser.frame` beziehungsweise
+`browser.tabs`. Die dekorierten `pyrpckit`-Methoden decken Navigation, Maus,
+Scrollen, Tastatur, Texteingabe, Clipboard sowie Tab-Liste, -Erstellung,
+-Aktivierung und -Schließen ab.
+
+Der Browser lässt sich mit `BROWSER_EXECUTABLE`, `BROWSER_CDP_URL`,
+`BROWSER_HEADLESS`, `BROWSER_WIDTH`, `BROWSER_HEIGHT`,
+`BROWSER_SCREENCAST_QUALITY` und `BROWSER_STARTUP_TIMEOUT` konfigurieren. Ohne
+`BROWSER_CDP_URL` startet das Backend selbst Chrome, Chromium oder Edge.
+
+Ein realer Adapter-Smoke-Test steht über
+`uv run python -m scripts.smoke_backend` bereit. V1 hat noch keine
+Authentifizierung; den Tunnel deshalb nur lokal oder hinter einem
+authentifizierenden Reverse Proxy bereitstellen.
