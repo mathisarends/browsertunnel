@@ -6,8 +6,58 @@
     <title>BrowserTunnel</title>
   </head>
   <body>
-    <main>
-      <canvas id="browser-canvas" width="1920" height="1080" aria-label="Browser-Stream"></canvas>
+    <main class="workspace">
+      <section class="browser-panel" aria-label="Browser-Vorschau">
+        <header class="browser-bar">
+          <div class="window-controls" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <form id="address-form" class="address-form">
+            <label class="visually-hidden" for="address-input">URL</label>
+            <input
+              id="address-input"
+              name="url"
+              type="url"
+              value="https://example.com"
+              placeholder="https://example.com"
+              autocomplete="url"
+              spellcheck="false"
+            />
+          </form>
+        </header>
+
+        <canvas
+          id="browser-canvas"
+          width="1600"
+          height="900"
+          aria-label="Browser-Stream"
+        ></canvas>
+
+        <footer class="stream-status">
+          <span><i class="status-dot"></i>Stream wartet</span>
+          <span>1600 × 900</span>
+        </footer>
+      </section>
+
+      <aside class="log-panel" aria-label="Event-Log">
+        <header class="log-header">
+          <div>
+            <p class="eyebrow">Debug stream</p>
+            <h1>Events</h1>
+          </div>
+          <button id="clear-logs" type="button">Clear</button>
+        </header>
+
+        <div class="log-legend" aria-label="Event-Richtungen">
+          <span><i class="outgoing-dot"></i>Frontend → Backend</span>
+          <span><i class="incoming-dot"></i>Backend → Frontend</span>
+        </div>
+
+        <ol id="event-log" class="event-log" aria-live="polite"></ol>
+        <p id="empty-log" class="empty-log">Noch keine Events.</p>
+      </aside>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

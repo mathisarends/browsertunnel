@@ -1,7 +1,8 @@
 # BrowserTunnel
 
-Minimaler Frontend-Scaffold für einen Browser-Stream: TypeScript mit einem
-zentrierten Canvas (intern 1920 × 1080 Pixel).
+Minimaler Frontend-Scaffold für einen Browser-Stream: TypeScript mit einer
+Browser-Vorschau (intern 1600 × 900 Pixel), URL-Leiste und Event-Log für das
+Debugging der Frontend-/Backend-Kommunikation.
 
 ## Setup
 
