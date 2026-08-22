@@ -2,7 +2,8 @@
 
 Minimaler Frontend-Scaffold für einen Browser-Stream: TypeScript mit einer
 Browser-Vorschau (intern 1600 × 900 Pixel), URL-Leiste und Event-Log für das
-Debugging der Frontend-/Backend-Kommunikation.
+Debugging der Frontend-/Backend-Kommunikation. Die Tab-Leiste unterstützt das
+Erstellen, Wechseln und Schließen mehrerer lokaler Browser-Tabs.
 
 ## Setup
 

@@ -8,24 +8,31 @@
   <body>
     <main class="workspace">
       <section class="browser-panel" aria-label="Browser-Vorschau">
-        <header class="browser-bar">
-          <div class="window-controls" aria-hidden="true">
-            <span></span>
-            <span></span>
-            <span></span>
+        <header class="browser-chrome">
+          <div class="tab-strip">
+            <div class="window-controls" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div id="tab-list" class="tab-list" role="tablist" aria-label="Browser-Tabs"></div>
+            <button id="new-tab" class="new-tab" type="button" aria-label="Neuen Tab öffnen">+</button>
           </div>
-          <form id="address-form" class="address-form">
-            <label class="visually-hidden" for="address-input">URL</label>
-            <input
-              id="address-input"
-              name="url"
-              type="url"
-              value="https://example.com"
-              placeholder="https://example.com"
-              autocomplete="url"
-              spellcheck="false"
-            />
-          </form>
+          <div class="browser-bar">
+            <form id="address-form" class="address-form">
+              <label class="visually-hidden" for="address-input">URL</label>
+              <input
+                id="address-input"
+                name="url"
+                type="text"
+                inputmode="url"
+                value="https://example.com"
+                placeholder="URL eingeben"
+                autocomplete="url"
+                spellcheck="false"
+              />
+            </form>
+          </div>
         </header>
 
         <canvas
@@ -36,7 +43,7 @@
         ></canvas>
 
         <footer class="stream-status">
-          <span><i class="status-dot"></i>Stream wartet</span>
+          <span><i class="status-dot"></i><span id="active-tab-status">Tab 1 · Stream wartet</span></span>
           <span>1600 × 900</span>
         </footer>
       </section>
