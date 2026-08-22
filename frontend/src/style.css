@@ -1,0 +1,37 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #111318;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+}
+
+main {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+#browser-canvas {
+  display: block;
+  width: min(1920px, calc(100vw - 48px));
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background: #050608;
+  border: 1px solid #2b3039;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 45%);
+}
