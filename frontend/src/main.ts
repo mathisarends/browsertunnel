@@ -1,12 +1,14 @@
 import "./style.css";
 import {
-  BrowserClient,
-  type BrowserCursor,
+  BrowserTunnelClient,
+  WebSocketRpcTransport,
   type BrowserEvent,
-  type BrowserTab,
   type ClickParams,
+  type CursorStyle as BrowserCursor,
   type HoverParams,
-} from "./api";
+  type RpcTransport,
+  type TabResult as BrowserTab,
+} from "@browsertunnel/browser-rpc-client";
 
 type EventPayload = Record<string, unknown>;
 type HoverPoint = Pick<HoverParams, "x" | "y">;
@@ -109,12 +111,12 @@ function renderTabs(): void {
       close.textContent = "×";
       close.addEventListener("click", (event) => {
         event.stopPropagation();
-        void rpc<{ tabs: BrowserTab[] }>("browser.tab.close", { tabId: tab.id }).then((result) =>
+        void client.browser.tab.close({ tabId: tab.id }).then((result) =>
           applyTabs(result.tabs),
         ).catch(reportError);
       });
       tabElement.addEventListener("click", () => {
-        void rpc<{ tabs: BrowserTab[] }>("browser.tab.activate", { tabId: tab.id }).then((result) =>
+        void client.browser.tab.activate({ tabId: tab.id }).then((result) =>
           applyTabs(result.tabs),
         ).catch(reportError);
       });
@@ -181,11 +183,30 @@ function receive(event: BrowserEvent): void {
   }
 }
 
-const client = new BrowserClient(receive);
+class LoggingRpcTransport implements RpcTransport {
+  constructor(private readonly transport: RpcTransport) {}
 
-function rpc<T = Record<string, never>>(method: string, params: object = {}): Promise<T> {
-  log("outgoing", method, params as EventPayload);
-  return client.call<T>(method, params);
+  request<TResult>(method: string, params: object): Promise<TResult> {
+    log("outgoing", method, params as EventPayload);
+    return this.transport.request<TResult>(method, params);
+  }
+
+  notifications(): AsyncIterable<unknown> {
+    return this.transport.notifications();
+  }
+
+  close(): Promise<void> {
+    return this.transport.close();
+  }
+}
+
+const socketUrl = new URL("/api/browser/ws", window.location.href);
+socketUrl.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+const socketTransport = new WebSocketRpcTransport(socketUrl);
+const client = new BrowserTunnelClient(new LoggingRpcTransport(socketTransport));
+
+async function receiveNotifications(): Promise<void> {
+  for await (const notification of client.notifications()) receive(notification.params);
 }
 
 function canvasPoint(event: MouseEvent | WheelEvent): { x: number; y: number } {
@@ -206,8 +227,7 @@ function mouseModifiers(event: MouseEvent): number {
 }
 
 function sendClick(params: ClickParams): void {
-  log("outgoing", "browser.input.click", params);
-  void client.click(params).catch(reportError);
+  void client.browser.input.click(params).catch(reportError);
 }
 
 function documentHover(params: HoverParams): void {
@@ -246,7 +266,7 @@ function queueHover(): void {
     if (!next) return;
 
     hoverInFlight = true;
-    void client.hover(next).catch(reportError).finally(() => {
+    void client.browser.input.hover(next).catch(reportError).finally(() => {
       hoverInFlight = false;
       if (latestHover) queueHover();
     });
@@ -256,11 +276,11 @@ function queueHover(): void {
 addressForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const value = addressInput.value.trim();
-  if (value) void rpc("browser.nav.navigate", { url: normalizeUrl(value) }).catch(reportError);
+  if (value) void client.browser.nav.navigate({ url: normalizeUrl(value) }).catch(reportError);
 });
 
 newTabButton.addEventListener("click", () => {
-  void rpc<{ tabs: BrowserTab[] }>("browser.tab.create", { url: "about:blank" }).then((result) => {
+  void client.browser.tab.create({ url: "about:blank" }).then((result) => {
     applyTabs(result.tabs);
     addressInput.focus();
   }).catch(reportError);
@@ -304,7 +324,11 @@ canvas.addEventListener(
   "wheel",
   (event) => {
     event.preventDefault();
-    void rpc("browser.input.scroll", { ...canvasPoint(event), deltaX: event.deltaX, deltaY: event.deltaY }).catch(reportError);
+    void client.browser.input.scroll({
+      ...canvasPoint(event),
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+    }).catch(reportError);
   },
   { passive: false },
 );
@@ -318,8 +342,7 @@ document.addEventListener("paste", (event) => {
   const text = event.clipboardData?.getData("text/plain");
   if (!text) return;
 
-  log("outgoing", "browser.input.paste", { length: text.length });
-  void client.call("browser.input.paste", { text }).catch(reportError);
+  void client.browser.input.paste({ text }).catch(reportError);
 });
 
 canvas.addEventListener("keydown", (event) => {
@@ -328,16 +351,26 @@ canvas.addEventListener("keydown", (event) => {
   event.preventDefault();
   const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
   if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
-    void rpc("browser.input.text.insert", { text: event.key }).catch(reportError);
+    void client.browser.input.text.insert({ text: event.key }).catch(reportError);
   } else {
-    void rpc("browser.input.key", { type: "keyDown", key: event.key, code: event.code, modifiers }).catch(reportError);
+    void client.browser.input.key({
+      type: "keyDown",
+      key: event.key,
+      code: event.code,
+      modifiers,
+    }).catch(reportError);
   }
 });
 canvas.addEventListener("keyup", (event) => {
   if (isPasteShortcut(event)) return;
   if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) return;
   const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
-  void rpc("browser.input.key", { type: "keyUp", key: event.key, code: event.code, modifiers }).catch(reportError);
+  void client.browser.input.key({
+    type: "keyUp",
+    key: event.key,
+    code: event.code,
+    modifiers,
+  }).catch(reportError);
 });
 
 clearLogsButton.addEventListener("click", () => {
@@ -345,11 +378,12 @@ clearLogsButton.addEventListener("click", () => {
   emptyLog.hidden = false;
 });
 
-client
+socketTransport
   .connect()
   .then(async () => {
     activeTabStatus.textContent = "Backend verbunden · Stream wartet";
-    const result = await rpc<{ tabs: BrowserTab[] }>("browser.tab.list");
+    void receiveNotifications().catch(reportError);
+    const result = await client.browser.tab.list();
     applyTabs(result.tabs);
   })
   .catch(reportError);

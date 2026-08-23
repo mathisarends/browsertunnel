@@ -2,10 +2,20 @@
   "name": "browsertunnel",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
+    "predev": "npm run generate:rpc",
     "dev": "vite --config frontend/vite.config.ts",
-    "build": "tsc -p frontend/tsconfig.json && vite build --config frontend/vite.config.ts",
-    "preview": "vite preview --config frontend/vite.config.ts"
+    "build": "npm run check:client && tsc -p frontend/tsconfig.json && vite build --config frontend/vite.config.ts",
+    "preview": "vite preview --config frontend/vite.config.ts",
+    "generate:rpc": "uv run python -m scripts.generate_schemas && uv run python -m scripts.generate_rpc_client",
+    "check:generated": "uv run python -m scripts.generate_schemas && uv run python -m scripts.generate_rpc_client --check",
+    "check:client": "npm run check --workspace @browsertunnel/browser-rpc-client"
+  },
+  "dependencies": {
+    "@browsertunnel/browser-rpc-client": "*"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

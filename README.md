@@ -25,6 +25,7 @@ sh scripts/start-frontend.sh
 # Danach im Browser öffnen: http://localhost:5173
 
 sh scripts/generate-schemas.sh # JSON-Schema und OpenRPC nach schemas/ schreiben
+npm run generate:rpc # Schemas und TypeScript-RPC-Client neu generieren
 uv run pytest        # tests
 uv run ruff check .  # lint
 uv run ruff format . # format
@@ -32,13 +33,16 @@ npm run build        # TypeScript prüfen und Frontend bauen
 ```
 
 Alternativ kann das Frontend nach `npm install` direkt mit `npm run dev`
-gestartet werden. Der Vite-Entwicklungsserver aktualisiert die Seite bei
-Änderungen an HTML, CSS oder TypeScript automatisch (Hot Reload).
+gestartet werden. Vor jedem Start erzeugt `predev` automatisch die aktuellen
+Schemas aus dem Backend und generiert daraus den TypeScript-RPC-Client. Der
+Vite-Entwicklungsserver aktualisiert die Seite bei Änderungen an HTML, CSS oder
+TypeScript automatisch (Hot Reload).
 
 Vite leitet im Entwicklungsmodus alle Aufrufe unter `/api` an das separat
-laufende Backend auf Port 8000 weiter. Der Einstiegspunkt für den späteren
-Framecast-Renderer ist `drawFrame()` in `frontend/src/main.ts`; für API-Aufrufe
-steht `getJson()` in `frontend/src/api.ts` bereit.
+laufende Backend auf Port 8000 weiter. Der statisch aus OpenRPC generierte Client
+ist das eigene npm-Workspace-Package `packages/browser-rpc-client`. Der Generator
+lebt vorerst unter `scripts/`; `npm run check:generated` erkennt veraltete
+generierte Dateien.
 
 ## Backend-Protokoll
 
