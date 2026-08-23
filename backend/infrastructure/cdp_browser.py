@@ -9,7 +9,6 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from pathlib import Path
-from typing import cast
 
 from cdpify import CDPSession, Client
 from cdpify.domains.browser.types import PermissionDescriptor
@@ -25,7 +24,7 @@ from backend.application import (
     TargetDetached,
 )
 from backend.application.browser import KeyEventType, MouseEventType
-from backend.infrastructure.events import EventBus
+from backend.infrastructure.events import BrowserEventForwarder, EventBus
 from backend.infrastructure.listener_event_bridge import ListenerEventBridge
 from backend.settings import BrowserSettings
 
@@ -44,12 +43,11 @@ class CdpBrowserTunnel(BrowserTunnel):
         self._profile: tempfile.TemporaryDirectory[str] | None = None
         self._active_target_id: str | None = None
         self._active_session: CDPSession | None = None
-        self._subscribers: set[asyncio.Queue[BrowserEvent]] = set()
         self._event_bus = EventBus()
         self._event_bridge = ListenerEventBridge(self._event_bus)
+        self._events = BrowserEventForwarder(self._event_bus)
         self._frame_task: asyncio.Task[None] | None = None
         self._state_lock = asyncio.Lock()
-        self._event_bus.on_all(self._forward_browser_event)
         self._event_bus.on(TargetDetached, self._recover_active_target)
 
     async def start(self) -> None:
@@ -96,9 +94,7 @@ class CdpBrowserTunnel(BrowserTunnel):
             self._profile = None
 
     async def events(self) -> AsyncIterator[BrowserEvent]:
-        queue: asyncio.Queue[BrowserEvent] = asyncio.Queue(maxsize=16)
-        async with self._state_lock:
-            self._subscribers.add(queue)
+        queue = self._events.subscribe()
         try:
             queue.put_nowait(TabsChanged(await self.list_tabs()))
             navigation = await self._event_bridge.current_navigation()
@@ -107,8 +103,7 @@ class CdpBrowserTunnel(BrowserTunnel):
             while True:
                 yield await queue.get()
         finally:
-            async with self._state_lock:
-                self._subscribers.discard(queue)
+            self._events.unsubscribe(queue)
 
     async def navigate(self, url: str) -> None:
         await self._session().page.navigate(url=url)
@@ -286,7 +281,7 @@ class CdpBrowserTunnel(BrowserTunnel):
             async for event in session.listen(
                 PageEvent.SCREENCAST_FRAME, ScreencastFrameEvent
             ):
-                self._publish(FrameReceived(base64.b64decode(event.data)))
+                self._events.publish(FrameReceived(base64.b64decode(event.data)))
                 await session.page.screencast_frame_ack(session_id=event.session_id)
         except asyncio.CancelledError:
             raise
@@ -304,9 +299,6 @@ class CdpBrowserTunnel(BrowserTunnel):
                 entry_id=history.entries[target_index].id
             )
 
-    async def _forward_browser_event(self, event: object) -> None:
-        self._publish(cast(BrowserEvent, event))
-
     async def _recover_active_target(self, event: TargetDetached) -> None:
         if event.tab_id != self._active_target_id:
             return
@@ -319,14 +311,6 @@ class CdpBrowserTunnel(BrowserTunnel):
         else:
             created = await self._browser().target.create_target(url="about:blank")
             await self._select_target(created.target_id)
-
-    def _publish(self, event: BrowserEvent) -> None:
-        for queue in tuple(self._subscribers):
-            if isinstance(event, FrameReceived) and queue.full():
-                continue
-            if queue.full():
-                queue.get_nowait()
-            queue.put_nowait(event)
 
     async def _page_targets(self):
         targets = await self._browser().target.get_targets()
