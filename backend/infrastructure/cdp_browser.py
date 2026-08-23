@@ -25,7 +25,7 @@ from backend.application import (
     TargetDetached,
 )
 from backend.application.browser import KeyEventType, MouseEventType
-from backend.infrastructure.event_bus import EventBus
+from backend.infrastructure.events import EventBus
 from backend.infrastructure.listener_event_bridge import ListenerEventBridge
 from backend.settings import BrowserSettings
 
@@ -49,8 +49,8 @@ class CdpBrowserTunnel(BrowserTunnel):
         self._event_bridge = ListenerEventBridge(self._event_bus)
         self._frame_task: asyncio.Task[None] | None = None
         self._state_lock = asyncio.Lock()
-        self._event_bus.subscribe_all(self._forward_browser_event)
-        self._event_bus.subscribe(TargetDetached, self._recover_active_target)
+        self._event_bus.on_all(self._forward_browser_event)
+        self._event_bus.on(TargetDetached, self._recover_active_target)
 
     async def start(self) -> None:
         try:

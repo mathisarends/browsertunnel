@@ -8,7 +8,7 @@ from cdpify.domains.target.events import TargetCrashedEvent as CdpTargetCrashedE
 from cdpify.domains.target.events import TargetEvent
 
 from backend.application import TargetCrashed
-from backend.infrastructure.event_bus import EventBus
+from backend.infrastructure.events import EventBus
 from backend.infrastructure.listener_event_bridge import ListenerEventBridge
 
 
@@ -38,27 +38,18 @@ class FakeListenerSource:
 
 
 @pytest.mark.asyncio
-async def test_event_bus_dispatches_typed_events_and_waits_with_predicate() -> None:
+async def test_event_bus_dispatches_typed_events_to_subscribers() -> None:
     event_bus = EventBus()
     received: list[int] = []
 
     async def collect(event: ExampleEvent) -> None:
         received.append(event.value)
 
-    event_bus.subscribe(ExampleEvent, collect)
-    waiting = asyncio.create_task(
-        event_bus.wait_for_event(
-            ExampleEvent,
-            timeout=1,
-            predicate=lambda event: event.value == 2,
-        )
-    )
-    await asyncio.sleep(0)
+    event_bus.on(ExampleEvent, collect)
 
     await event_bus.dispatch(ExampleEvent(1))
     await event_bus.dispatch(ExampleEvent(2))
 
-    assert await waiting == ExampleEvent(2)
     assert received == [1, 2]
 
 
@@ -81,23 +72,19 @@ async def test_target_bridge_owns_cdp_listener_registration() -> None:
         }
 
         domain_events: list[object] = []
+        received = asyncio.Event()
 
         async def collect(event: object) -> None:
             domain_events.append(event)
+            received.set()
 
-        event_bus.subscribe_all(collect)
-        waiting = asyncio.create_task(
-            event_bus.wait_for_event(TargetCrashed, timeout=1)
-        )
-        await asyncio.sleep(0)
+        event_bus.on_all(collect)
         cdp_event = CdpTargetCrashedEvent(
             target_id="tab-1", status="crashed", error_code=7
         )
         await source.emit(TargetEvent.TARGET_CRASHED, cdp_event)
+        await asyncio.wait_for(received.wait(), timeout=1)
 
-        translated = await waiting
-        assert translated == TargetCrashed("tab-1", "crashed", 7)
-        assert domain_events == [translated]
-        assert cdp_event not in domain_events
+        assert domain_events == [TargetCrashed("tab-1", "crashed", 7)]
     finally:
         await bridge.stop()

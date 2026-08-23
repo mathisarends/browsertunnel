@@ -28,7 +28,7 @@ from backend.application import (
     TargetCrashed,
     TargetDetached,
 )
-from backend.infrastructure.event_bus import EventBus
+from backend.infrastructure.events import EventBus
 
 logger = logging.getLogger(__name__)
 
