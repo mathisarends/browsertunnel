@@ -1,214 +1,230 @@
 import "./style.css";
+import { BrowserClient, type BrowserEvent, type BrowserTab } from "./api";
 
-type EventDirection = "incoming" | "outgoing";
 type EventPayload = Record<string, unknown>;
-type BrowserTab = {
-  id: string;
-  title: string;
-  url: string;
-};
 
-function requireElement<T extends Element>(selector: string): T {
-  const element = document.querySelector<T>(selector);
-
-  if (!element) {
-    throw new Error(`Required element not found: ${selector}`);
-  }
-
-  return element;
+function element<T extends Element>(selector: string): T {
+  const found = document.querySelector<T>(selector);
+  if (!found) throw new Error(`Required element not found: ${selector}`);
+  return found;
 }
 
-const canvas = requireElement<HTMLCanvasElement>("#browser-canvas");
-const addressForm = requireElement<HTMLFormElement>("#address-form");
-const addressInput = requireElement<HTMLInputElement>("#address-input");
-const tabList = requireElement<HTMLDivElement>("#tab-list");
-const newTabButton = requireElement<HTMLButtonElement>("#new-tab");
-const activeTabStatus = requireElement<HTMLSpanElement>("#active-tab-status");
-const eventLog = requireElement<HTMLOListElement>("#event-log");
-const emptyLog = requireElement<HTMLParagraphElement>("#empty-log");
-const clearLogsButton = requireElement<HTMLButtonElement>("#clear-logs");
+const canvas = element<HTMLCanvasElement>("#browser-canvas");
+const addressForm = element<HTMLFormElement>("#address-form");
+const addressInput = element<HTMLInputElement>("#address-input");
+const tabList = element<HTMLDivElement>("#tab-list");
+const newTabButton = element<HTMLButtonElement>("#new-tab");
+const activeTabStatus = element<HTMLSpanElement>("#active-tab-status");
+const eventLog = element<HTMLOListElement>("#event-log");
+const emptyLog = element<HTMLParagraphElement>("#empty-log");
+const clearLogsButton = element<HTMLButtonElement>("#clear-logs");
 
-let nextTabNumber = 2;
-let tabs: BrowserTab[] = [
-  { id: "tab-1", title: "Example", url: "https://example.com" },
-];
-let activeTabId = tabs[0].id;
+let tabs: BrowserTab[] = [];
+let latestFrame: string | undefined;
+let renderingFrame = false;
 
-function formatPayload(payload: EventPayload): string {
-  return JSON.stringify(payload, null, 2);
-}
-
-function appendEvent(direction: EventDirection, name: string, payload: EventPayload): void {
+function log(direction: "incoming" | "outgoing", name: string, payload: EventPayload = {}): void {
   const entry = document.createElement("li");
   entry.className = `log-entry ${direction}`;
-
   const meta = document.createElement("div");
   meta.className = "log-meta";
-
   const directionLabel = document.createElement("span");
   directionLabel.textContent = direction === "outgoing" ? "OUT" : "IN";
-
   const eventName = document.createElement("strong");
   eventName.textContent = name;
-
   const timestamp = document.createElement("time");
   timestamp.textContent = new Date().toLocaleTimeString("de-DE", { hour12: false });
-
-  const payloadElement = document.createElement("pre");
-  payloadElement.textContent = formatPayload(payload);
-
+  const data = document.createElement("pre");
+  data.textContent = JSON.stringify(payload, null, 2);
   meta.append(directionLabel, eventName, timestamp);
-  entry.append(meta, payloadElement);
+  entry.append(meta, data);
   eventLog.append(entry);
   emptyLog.hidden = true;
   eventLog.scrollTop = eventLog.scrollHeight;
 }
 
-function getActiveTab(): BrowserTab {
-  const activeTab = tabs.find((tab) => tab.id === activeTabId);
-
-  if (!activeTab) {
-    throw new Error(`Active tab not found: ${activeTabId}`);
-  }
-
-  return activeTab;
-}
-
-function titleFromUrl(url: string): string {
-  if (!url) {
-    return "Neuer Tab";
-  }
-
-  try {
-    return new URL(url).hostname || url;
-  } catch {
-    return url;
-  }
+function reportError(error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  activeTabStatus.textContent = `Fehler · ${message}`;
+  log("incoming", "client.error", { message });
 }
 
 function normalizeUrl(value: string): string {
   return /^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`;
 }
 
-function activateTab(tabId: string, emitEvent = true): void {
-  activeTabId = tabId;
-  const tab = getActiveTab();
-  addressInput.value = tab.url;
-  activeTabStatus.textContent = `${tab.title} · Stream wartet`;
+function activeTab(): BrowserTab | undefined {
+  return tabs.find((tab) => tab.active);
+}
+
+function applyTabs(nextTabs: BrowserTab[]): void {
+  tabs = nextTabs;
+  const active = activeTab();
+  if (active) {
+    addressInput.value = active.url === "about:blank" ? "" : active.url;
+    activeTabStatus.textContent = `${active.title || "Neuer Tab"} · verbunden`;
+  }
   renderTabs();
-
-  if (emitEvent) {
-    recordOutgoingEvent("tab.activated", { tabId });
-  }
-}
-
-function createTab(): void {
-  const id = `tab-${nextTabNumber++}`;
-  const tab = { id, title: "Neuer Tab", url: "" };
-  tabs.push(tab);
-  activateTab(id, false);
-  recordOutgoingEvent("tab.created", { tabId: id });
-  addressInput.focus();
-}
-
-function closeTab(tabId: string): void {
-  const closedIndex = tabs.findIndex((tab) => tab.id === tabId);
-
-  if (closedIndex < 0) {
-    return;
-  }
-
-  tabs.splice(closedIndex, 1);
-  recordOutgoingEvent("tab.closed", { tabId });
-
-  if (tabs.length === 0) {
-    createTab();
-    return;
-  }
-
-  if (activeTabId === tabId) {
-    const fallbackTab = tabs[Math.min(closedIndex, tabs.length - 1)];
-    activateTab(fallbackTab.id, false);
-  } else {
-    renderTabs();
-  }
 }
 
 function renderTabs(): void {
-  const tabElements = tabs.map((tab) => {
-    const tabElement = document.createElement("div");
-    tabElement.className = "browser-tab";
-    tabElement.dataset.tabId = tab.id;
-    tabElement.role = "tab";
-    tabElement.tabIndex = tab.id === activeTabId ? 0 : -1;
-    tabElement.ariaSelected = String(tab.id === activeTabId);
+  tabList.replaceChildren(
+    ...tabs.map((tab) => {
+      const tabElement = document.createElement("div");
+      tabElement.className = "browser-tab";
+      tabElement.role = "tab";
+      tabElement.tabIndex = tab.active ? 0 : -1;
+      tabElement.ariaSelected = String(tab.active);
 
-    const favicon = document.createElement("i");
-    favicon.setAttribute("aria-hidden", "true");
+      const favicon = document.createElement("i");
+      favicon.ariaHidden = "true";
+      const title = document.createElement("span");
+      title.textContent = tab.title || "Neuer Tab";
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "close-tab";
+      close.ariaLabel = `${title.textContent} schließen`;
+      close.textContent = "×";
+      close.addEventListener("click", (event) => {
+        event.stopPropagation();
+        void rpc<{ tabs: BrowserTab[] }>("browser.tab.close", { tabId: tab.id }).then((result) =>
+          applyTabs(result.tabs),
+        ).catch(reportError);
+      });
+      tabElement.addEventListener("click", () => {
+        void rpc<{ tabs: BrowserTab[] }>("browser.tab.activate", { tabId: tab.id }).then((result) =>
+          applyTabs(result.tabs),
+        ).catch(reportError);
+      });
+      tabElement.append(favicon, title, close);
+      return tabElement;
+    }),
+  );
+}
 
-    const title = document.createElement("span");
-    title.textContent = tab.title;
+async function renderLatestFrame(): Promise<void> {
+  if (renderingFrame) return;
+  renderingFrame = true;
+  try {
+    while (latestFrame) {
+      const encoded = latestFrame;
+      latestFrame = undefined;
+      const binary = atob(encoded);
+      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+      const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/jpeg" }));
+      canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+    }
+  } finally {
+    renderingFrame = false;
+  }
+}
 
-    const closeButton = document.createElement("button");
-    closeButton.type = "button";
-    closeButton.className = "close-tab";
-    closeButton.ariaLabel = `${tab.title} schließen`;
-    closeButton.textContent = "×";
-    closeButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      closeTab(tab.id);
-    });
+function receive(event: BrowserEvent): void {
+  if (event.type === "browser.frame") {
+    latestFrame = event.data;
+    void renderLatestFrame().catch(reportError);
+    return;
+  }
 
-    tabElement.addEventListener("click", () => activateTab(tab.id));
-    tabElement.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        activateTab(tab.id);
-      }
-    });
+  log("incoming", event.type, event as unknown as EventPayload);
+  if (event.type === "browser.tabs") {
+    applyTabs(event.tabs);
+  } else if (event.type === "browser.navigation") {
+    tabs = tabs.map((tab) =>
+      tab.id === event.tabId ? { ...tab, title: event.title, url: event.url } : tab,
+    );
+    if (activeTab()?.id === event.tabId) {
+      addressInput.value = event.url;
+      activeTabStatus.textContent = `${event.title || "Neuer Tab"} · ${event.loading ? "lädt" : "verbunden"}`;
+    }
+    renderTabs();
+  } else if (event.type === "browser.targetCrashed") {
+    activeTabStatus.textContent = `Browser abgestürzt · ${event.status}`;
+  }
+}
 
-    tabElement.append(favicon, title, closeButton);
-    return tabElement;
-  });
+const client = new BrowserClient(receive);
 
-  tabList.replaceChildren(...tabElements);
+function rpc<T = Record<string, never>>(method: string, params: object = {}): Promise<T> {
+  log("outgoing", method, params as EventPayload);
+  return client.call<T>(method, params);
+}
+
+function canvasPoint(event: MouseEvent | WheelEvent): { x: number; y: number } {
+  const bounds = canvas.getBoundingClientRect();
+  return {
+    x: ((event.clientX - bounds.left) / bounds.width) * canvas.width,
+    y: ((event.clientY - bounds.top) / bounds.height) * canvas.height,
+  };
 }
 
 addressForm.addEventListener("submit", (event) => {
   event.preventDefault();
-
   const value = addressInput.value.trim();
-  if (value) {
-    const url = normalizeUrl(value);
-    const tab = getActiveTab();
-    tab.url = url;
-    tab.title = titleFromUrl(url);
-    addressInput.value = url;
-    renderTabs();
-    activeTabStatus.textContent = `${tab.title} · Stream wartet`;
-    recordOutgoingEvent("navigate", { tabId: tab.id, url });
-  }
+  if (value) void rpc("browser.navigate", { url: normalizeUrl(value) }).catch(reportError);
 });
 
-newTabButton.addEventListener("click", createTab);
+newTabButton.addEventListener("click", () => {
+  void rpc<{ tabs: BrowserTab[] }>("browser.tab.create", { url: "about:blank" }).then((result) => {
+    applyTabs(result.tabs);
+    addressInput.focus();
+  }).catch(reportError);
+});
+
+canvas.tabIndex = 0;
+canvas.addEventListener("mousedown", (event) => {
+  canvas.focus();
+  void rpc("browser.mouse", {
+    type: "mousePressed",
+    ...canvasPoint(event),
+    button: "left",
+    buttons: 1,
+    clickCount: event.detail,
+  }).catch(reportError);
+});
+canvas.addEventListener("mouseup", (event) => {
+  void rpc("browser.mouse", {
+    type: "mouseReleased",
+    ...canvasPoint(event),
+    button: "left",
+    buttons: 0,
+    clickCount: event.detail,
+  }).catch(reportError);
+});
+canvas.addEventListener(
+  "wheel",
+  (event) => {
+    event.preventDefault();
+    void rpc("browser.scroll", { ...canvasPoint(event), deltaX: event.deltaX, deltaY: event.deltaY }).catch(reportError);
+  },
+  { passive: false },
+);
+canvas.addEventListener("keydown", (event) => {
+  event.preventDefault();
+  const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
+  if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
+    void rpc("browser.text.insert", { text: event.key }).catch(reportError);
+  } else {
+    void rpc("browser.key", { type: "keyDown", key: event.key, code: event.code, modifiers }).catch(reportError);
+  }
+});
+canvas.addEventListener("keyup", (event) => {
+  if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) return;
+  const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
+  void rpc("browser.key", { type: "keyUp", key: event.key, code: event.code, modifiers }).catch(reportError);
+});
 
 clearLogsButton.addEventListener("click", () => {
   eventLog.replaceChildren();
   emptyLog.hidden = false;
 });
 
-export function recordOutgoingEvent(name: string, payload: EventPayload = {}): void {
-  appendEvent("outgoing", name, payload);
-}
-
-export function recordIncomingEvent(name: string, payload: EventPayload = {}): void {
-  appendEvent("incoming", name, payload);
-}
-
-// A future framecast client can draw decoded frames into this canvas.
-export function drawFrame(frame: CanvasImageSource): void {
-  const context = canvas.getContext("2d");
-  context?.drawImage(frame, 0, 0, canvas.width, canvas.height);
-}
-
-renderTabs();
+client
+  .connect()
+  .then(async () => {
+    activeTabStatus.textContent = "Backend verbunden · Stream wartet";
+    const result = await rpc<{ tabs: BrowserTab[] }>("browser.tab.list");
+    applyTabs(result.tabs);
+  })
+  .catch(reportError);
