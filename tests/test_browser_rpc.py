@@ -14,6 +14,7 @@ class FakeBrowser(Browser):
         self.navigation_commands: list[tuple[str, bool | None]] = []
         self.click_events: list[dict] = []
         self.hover_events: list[dict] = []
+        self.pasted: list[str] = []
         self.tabs = [BrowserTab("tab-1", "Example", "about:blank", True)]
 
     async def start(self) -> None:
@@ -60,6 +61,9 @@ class FakeBrowser(Browser):
     async def insert_text(self, text: str) -> None:
         pass
 
+    async def paste(self, text: str) -> None:
+        self.pasted.append(text)
+
     async def read_clipboard(self) -> str:
         return "clipboard"
 
@@ -100,6 +104,25 @@ async def test_json_rpc_dispatches_browser_commands() -> None:
         "result": {},
     }
     assert browser.navigated_to == "https://example.com"
+
+
+@pytest.mark.asyncio
+async def test_json_rpc_pastes_viewer_clipboard_text() -> None:
+    browser = FakeBrowser()
+    server = RpcServer(BrowserRpcMethods(browser), protocol=BROWSER_PROTOCOL)
+
+    response = await server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "method": "browser.clipboard.paste",
+            "params": {"text": "from the local machine"},
+        }
+    )
+
+    assert response is not None
+    assert response.model_dump(mode="json")["result"] == {}
+    assert browser.pasted == ["from the local machine"]
 
 
 @pytest.mark.asyncio

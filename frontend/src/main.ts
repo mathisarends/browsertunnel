@@ -305,7 +305,23 @@ canvas.addEventListener(
   },
   { passive: false },
 );
+function isPasteShortcut(event: KeyboardEvent): boolean {
+  return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "v";
+}
+
+document.addEventListener("paste", (event) => {
+  if (document.activeElement !== canvas) return;
+  event.preventDefault();
+  const text = event.clipboardData?.getData("text/plain");
+  if (!text) return;
+
+  log("outgoing", "browser.clipboard.paste", { length: text.length });
+  void client.call("browser.clipboard.paste", { text }).catch(reportError);
+});
+
 canvas.addEventListener("keydown", (event) => {
+  // Let the browser turn the shortcut into a paste event carrying the clipboard.
+  if (isPasteShortcut(event)) return;
   event.preventDefault();
   const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
   if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
@@ -315,6 +331,7 @@ canvas.addEventListener("keydown", (event) => {
   }
 });
 canvas.addEventListener("keyup", (event) => {
+  if (isPasteShortcut(event)) return;
   if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) return;
   const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
   void rpc("browser.key", { type: "keyUp", key: event.key, code: event.code, modifiers }).catch(reportError);

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator
 
 from cdpify import CDPSession, Client
@@ -22,6 +23,52 @@ from backend.infrastructure.events import BrowserEventForwarder, EventBus
 from backend.infrastructure.listener_event_bridge import ListenerEventBridge
 from backend.infrastructure.screencast_event_bridge import ScreencastEventBridge
 from backend.settings import BrowserSettings
+
+logger = logging.getLogger(__name__)
+
+_CONTROL_MODIFIER = 2
+_VIRTUAL_KEY_V = 86
+
+_COPY_SOURCE = """
+(text) => {
+  const active = document.activeElement;
+  const selection = document.getSelection();
+  const ranges = [];
+  for (let i = 0; selection && i < selection.rangeCount; i += 1) {
+    ranges.push(selection.getRangeAt(i));
+  }
+  const start = active && "selectionStart" in active ? active.selectionStart : null;
+  const end = active && "selectionEnd" in active ? active.selectionEnd : null;
+
+  const carrier = document.createElement("textarea");
+  carrier.value = text;
+  carrier.setAttribute(
+    "style",
+    "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0",
+  );
+  document.body.append(carrier);
+  carrier.select();
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } finally {
+    carrier.remove();
+  }
+
+  if (active && active.focus) active.focus();
+  if (start !== null && active.setSelectionRange) {
+    active.setSelectionRange(start, end);
+  } else if (selection && ranges.length) {
+    selection.removeAllRanges();
+    for (const range of ranges) selection.addRange(range);
+  }
+  return copied;
+}
+"""
+
+
+class ClipboardUnavailableError(RuntimeError):
+    """Raised when the page refuses to hand over or accept clipboard text."""
 
 
 class CdpBrowser(Browser):
@@ -196,15 +243,37 @@ class CdpBrowser(Browser):
         return str(result.result.value or "")
 
     async def write_clipboard(self, text: str) -> None:
-        expression = f"navigator.clipboard.writeText({json.dumps(text)})"
-        result = await self._session().runtime.evaluate(
-            expression=expression,
-            await_promise=True,
+        session = self._session()
+        result = await session.runtime.evaluate(
+            expression=f"({_COPY_SOURCE})({json.dumps(text)})",
             return_by_value=True,
             user_gesture=True,
         )
-        if result.exception_details is not None:
-            raise RuntimeError("The page denied clipboard write access")
+        if result.exception_details is not None or not result.result.value:
+            raise ClipboardUnavailableError("The page denied clipboard write access")
+
+    async def paste(self, text: str) -> None:
+        """Put text on the page clipboard and let the page paste it natively.
+
+        Pasting through the editing command keeps the page's own paste handling
+        intact, which plain text insertion would bypass.
+        """
+        session = self._session()
+        try:
+            await self.write_clipboard(text)
+        except ClipboardUnavailableError:
+            logger.debug("Clipboard is unavailable; inserting pasted text directly")
+            await self.insert_text(text)
+            return
+        for event_type, commands in (("keyDown", ["paste"]), ("keyUp", None)):
+            await session.input.dispatch_key_event(
+                type=event_type,
+                key="v",
+                code="KeyV",
+                modifiers=_CONTROL_MODIFIER,
+                windows_virtual_key_code=_VIRTUAL_KEY_V,
+                commands=commands,
+            )
 
     async def list_tabs(self) -> list[BrowserTab]:
         return [
