@@ -8,7 +8,7 @@ WebSocket.
 Learning project, not a hardened product: no auth, no rate limiting. It's a
 reference for the core idea, not something to deploy as is.
 
-https://github.com/mathisarends/browsertunnel/releases/download/demo-assets/video.mp4
+<video src="https://github.com/mathisarends/browsertunnel/releases/download/demo-assets/video.mp4" controls></video>
 
 Sped up 1.5x.
 
