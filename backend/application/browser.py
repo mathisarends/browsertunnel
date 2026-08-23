@@ -25,7 +25,7 @@ class BrowserTab:
 
 
 @dataclass(frozen=True, slots=True)
-class FrameReceived:
+class ScreencastFrame:
     data: bytes
 
 
@@ -57,20 +57,28 @@ class TargetDetached:
     tab_id: str | None
 
 
-type BrowserEvent = (
-    FrameReceived | TabsChanged | NavigationChanged | TargetCrashed | TargetDetached
-)
+type BrowserEvent = TabsChanged | NavigationChanged | TargetCrashed | TargetDetached
+type BrowserStreamItem = BrowserEvent | ScreencastFrame
 
 
 class BrowserTabNotFoundError(LookupError):
     pass
 
 
-class BrowserTunnel(ABC):
-    """Application-owned port for one remotely controlled browser."""
+class Browser(ABC):
+    """Application-owned port for a controllable, screencast-capable browser."""
+
+    @abstractmethod
+    async def start(self) -> None: ...
+
+    @abstractmethod
+    async def stop(self) -> None: ...
 
     @abstractmethod
     async def events(self) -> AsyncIterator[BrowserEvent]: ...
+
+    @abstractmethod
+    async def screencast_frames(self) -> AsyncIterator[ScreencastFrame]: ...
 
     @abstractmethod
     async def navigate(self, url: str) -> None: ...

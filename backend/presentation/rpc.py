@@ -5,9 +5,9 @@ import pyrpckit as rpc
 from pydantic import BaseModel, ConfigDict, Field
 
 from backend.application import (
+    Browser,
     BrowserTab,
     BrowserTabNotFoundError,
-    BrowserTunnel,
     ClickEventType,
     KeyEventType,
 )
@@ -173,7 +173,7 @@ def vars_from_tab(tab: BrowserTab) -> dict[str, str | bool]:
 
 
 class BrowserRpcMethods(rpc.RpcHandler):
-    def __init__(self, browser: BrowserTunnel) -> None:
+    def __init__(self, browser: Browser) -> None:
         self._browser = browser
 
     @rpc.method(BrowserRpcMethod.NAVIGATE)

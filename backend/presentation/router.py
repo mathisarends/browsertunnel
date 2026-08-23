@@ -8,8 +8,7 @@ from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from backend.application import (
-    BrowserTunnel,
-    FrameReceived,
+    Browser,
     NavigationChanged,
     TabsChanged,
     TargetCrashed,
@@ -44,7 +43,7 @@ async def open_rpc_schema() -> dict:
 @inject
 async def browser_socket(
     websocket: WebSocket,
-    browser: FromDishka[BrowserTunnel],
+    browser: FromDishka[Browser],
 ) -> None:
     await websocket.accept()
     send_lock = asyncio.Lock()
@@ -60,10 +59,6 @@ async def browser_socket(
     async def stream_events() -> None:
         async for event in browser.events():
             match event:
-                case FrameReceived(data=data):
-                    params = BrowserFrameEvent(
-                        data=base64.b64encode(data).decode("ascii")
-                    )
                 case TabsChanged(tabs=tabs):
                     params = BrowserTabsEvent(tabs=tabs_result(tabs).tabs)
                 case NavigationChanged():
@@ -91,7 +86,19 @@ async def browser_socket(
                 )
             )
 
+    async def stream_screencast() -> None:
+        async for frame in browser.screencast_frames():
+            await send(
+                rpc.RpcNotification(
+                    method="browser.event",
+                    params=BrowserFrameEvent(
+                        data=base64.b64encode(frame.data).decode("ascii")
+                    ),
+                )
+            )
+
     event_task = asyncio.create_task(stream_events())
+    screencast_task = asyncio.create_task(stream_screencast())
     try:
         while True:
             raw_request = await websocket.receive_text()
@@ -107,5 +114,8 @@ async def browser_socket(
         pass
     finally:
         event_task.cancel()
+        screencast_task.cancel()
         with suppress(asyncio.CancelledError):
             await event_task
+        with suppress(asyncio.CancelledError):
+            await screencast_task

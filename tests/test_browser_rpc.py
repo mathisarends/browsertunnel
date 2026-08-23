@@ -4,11 +4,11 @@ import pytest
 from pyrpckit import RpcServer
 from pyrpckit.schema import render_json_schema, render_openrpc
 
-from backend.application import BrowserEvent, BrowserTab, BrowserTunnel
+from backend.application import Browser, BrowserEvent, BrowserTab, ScreencastFrame
 from backend.presentation.rpc import BROWSER_PROTOCOL, BrowserRpcMethods
 
 
-class FakeBrowser(BrowserTunnel):
+class FakeBrowser(Browser):
     def __init__(self) -> None:
         self.navigated_to: str | None = None
         self.navigation_commands: list[tuple[str, bool | None]] = []
@@ -16,7 +16,17 @@ class FakeBrowser(BrowserTunnel):
         self.hover_events: list[dict] = []
         self.tabs = [BrowserTab("tab-1", "Example", "about:blank", True)]
 
+    async def start(self) -> None:
+        pass
+
+    async def stop(self) -> None:
+        pass
+
     async def events(self) -> AsyncIterator[BrowserEvent]:
+        if False:
+            yield
+
+    async def screencast_frames(self) -> AsyncIterator[ScreencastFrame]:
         if False:
             yield
 

@@ -1,3 +1,3 @@
-from backend.infrastructure.cdp_browser import CdpBrowserTunnel
+from backend.infrastructure.cdp_browser import CdpBrowser
 
-__all__ = ["CdpBrowserTunnel"]
+__all__ = ["CdpBrowser"]

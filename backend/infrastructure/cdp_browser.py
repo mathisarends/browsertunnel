@@ -15,13 +15,13 @@ from cdpify.domains.browser.types import PermissionDescriptor
 from cdpify.domains.page.events import PageEvent, ScreencastFrameEvent
 
 from backend.application import (
+    Browser,
     BrowserEvent,
     BrowserTab,
     BrowserTabNotFoundError,
-    BrowserTunnel,
     ClickEventType,
-    FrameReceived,
     KeyEventType,
+    ScreencastFrame,
     TabsChanged,
     TargetDetached,
 )
@@ -36,7 +36,7 @@ class BrowserStartupError(RuntimeError):
     pass
 
 
-class CdpBrowserTunnel(BrowserTunnel):
+class CdpBrowser(Browser):
     def __init__(self, settings: BrowserSettings) -> None:
         self._settings = settings
         self._client: Client | None = None
@@ -73,10 +73,10 @@ class CdpBrowserTunnel(BrowserTunnel):
                 target_id = pages[0].target_id
             await self._select_target(target_id)
         except BaseException:
-            await self.close()
+            await self.stop()
             raise
 
-    async def close(self) -> None:
+    async def stop(self) -> None:
         await self._stop_active_listeners()
         await self._event_bridge.stop()
         if self._client is not None:
@@ -102,7 +102,19 @@ class CdpBrowserTunnel(BrowserTunnel):
             if navigation is not None:
                 queue.put_nowait(navigation)
             while True:
-                yield await queue.get()
+                event = await queue.get()
+                if not isinstance(event, ScreencastFrame):
+                    yield event
+        finally:
+            self._browser_event_forwarder.unsubscribe(queue)
+
+    async def screencast_frames(self) -> AsyncIterator[ScreencastFrame]:
+        queue = self._browser_event_forwarder.subscribe()
+        try:
+            while True:
+                event = await queue.get()
+                if isinstance(event, ScreencastFrame):
+                    yield event
         finally:
             self._browser_event_forwarder.unsubscribe(queue)
 
@@ -301,7 +313,7 @@ class CdpBrowserTunnel(BrowserTunnel):
                 PageEvent.SCREENCAST_FRAME, ScreencastFrameEvent
             ):
                 self._browser_event_forwarder.publish(
-                    FrameReceived(base64.b64decode(event.data))
+                    ScreencastFrame(base64.b64decode(event.data))
                 )
                 await session.page.screencast_frame_ack(session_id=event.session_id)
         except asyncio.CancelledError:

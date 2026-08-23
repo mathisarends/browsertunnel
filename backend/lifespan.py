@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from backend.application import BrowserTunnel
+from backend.application import Browser
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Starting up BrowserTunnel API")
     container = app.state.dishka_container
-    await container.get(BrowserTunnel)
+    await container.get(Browser)
     try:
         yield
     finally:
