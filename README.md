@@ -8,6 +8,16 @@ WebSocket.
 Learning project, not a hardened product: no auth, no rate limiting. It's a
 reference for the core idea, not something to deploy as is.
 
+<video src="static/video.mp4" controls></video>
+
+Sped up 1.5x.
+
+The tricky parts: full clipboard support (copy/read/write round-tripped
+through CDP), full tab support (list/create/activate/close, all in sync with
+the mirrored session), and cursor shape. The cursor CDP reports has to be
+translated into a CSS cursor and played back in the frontend itself, it's
+not part of the video stream.
+
 ## Architecture
 
 ```
