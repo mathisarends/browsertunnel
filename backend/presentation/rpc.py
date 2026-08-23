@@ -1,11 +1,10 @@
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Literal
 
 import pyrpckit as rpc
 from pydantic import BaseModel, ConfigDict, Field
 
-from backend.application import BrowserTab, BrowserTunnel
-from backend.infrastructure.cdp_browser import BrowserTargetNotFoundError
+from backend.application import BrowserTab, BrowserTabNotFoundError, BrowserTunnel
 
 
 class RpcModel(BaseModel):
@@ -14,6 +13,10 @@ class RpcModel(BaseModel):
 
 class BrowserRpcMethod(StrEnum):
     NAVIGATE = "browser.navigate"
+    GO_BACK = "browser.goBack"
+    GO_FORWARD = "browser.goForward"
+    RELOAD = "browser.reload"
+    STOP_LOADING = "browser.stopLoading"
     MOUSE = "browser.mouse"
     SCROLL = "browser.scroll"
     KEY = "browser.key"
@@ -36,6 +39,10 @@ class EmptyResult(RpcModel):
 
 class NavigateParams(RpcModel):
     url: str = Field(min_length=1)
+
+
+class ReloadParams(RpcModel):
+    ignore_cache: bool = Field(default=False, alias="ignoreCache")
 
 
 class MouseParams(RpcModel):
@@ -100,8 +107,6 @@ class BrowserTabNotFound(rpc.RpcError):
 class BrowserFrameEvent(RpcModel):
     type: Literal["browser.frame"] = "browser.frame"
     data: str
-    session_id: int = Field(alias="sessionId")
-    metadata: dict[str, Any]
 
 
 @rpc.event
@@ -110,7 +115,39 @@ class BrowserTabsEvent(RpcModel):
     tabs: list[TabResult]
 
 
-type BrowserEvent = BrowserFrameEvent | BrowserTabsEvent
+@rpc.event
+class BrowserNavigationEvent(RpcModel):
+    type: Literal["browser.navigation"] = "browser.navigation"
+    tab_id: str = Field(alias="tabId")
+    title: str
+    url: str
+    loading: bool
+    can_go_back: bool = Field(alias="canGoBack")
+    can_go_forward: bool = Field(alias="canGoForward")
+    error: str | None = None
+
+
+@rpc.event
+class BrowserTargetCrashedEvent(RpcModel):
+    type: Literal["browser.targetCrashed"] = "browser.targetCrashed"
+    tab_id: str = Field(alias="tabId")
+    status: str
+    error_code: int = Field(alias="errorCode")
+
+
+@rpc.event
+class BrowserTargetDetachedEvent(RpcModel):
+    type: Literal["browser.targetDetached"] = "browser.targetDetached"
+    tab_id: str | None = Field(alias="tabId")
+
+
+type BrowserEvent = (
+    BrowserFrameEvent
+    | BrowserTabsEvent
+    | BrowserNavigationEvent
+    | BrowserTargetCrashedEvent
+    | BrowserTargetDetachedEvent
+)
 
 
 def tabs_result(tabs: list[BrowserTab]) -> TabsResult:
@@ -129,6 +166,30 @@ class BrowserRpcMethods(rpc.RpcHandler):
     async def navigate(self, params: NavigateParams) -> EmptyResult:
         """Navigate the active tab to a URL."""
         await self._browser.navigate(params.url)
+        return EmptyResult()
+
+    @rpc.method(BrowserRpcMethod.GO_BACK)
+    async def go_back(self, params: EmptyParams) -> EmptyResult:
+        """Navigate the active tab to its previous history entry, if available."""
+        await self._browser.go_back()
+        return EmptyResult()
+
+    @rpc.method(BrowserRpcMethod.GO_FORWARD)
+    async def go_forward(self, params: EmptyParams) -> EmptyResult:
+        """Navigate the active tab to its next history entry, if available."""
+        await self._browser.go_forward()
+        return EmptyResult()
+
+    @rpc.method(BrowserRpcMethod.RELOAD)
+    async def reload(self, params: ReloadParams) -> EmptyResult:
+        """Reload the active tab, optionally bypassing its cache."""
+        await self._browser.reload(ignore_cache=params.ignore_cache)
+        return EmptyResult()
+
+    @rpc.method(BrowserRpcMethod.STOP_LOADING)
+    async def stop_loading(self, params: EmptyParams) -> EmptyResult:
+        """Stop loading the active tab."""
+        await self._browser.stop_loading()
         return EmptyResult()
 
     @rpc.method(BrowserRpcMethod.MOUSE)
@@ -201,7 +262,7 @@ class BrowserRpcMethods(rpc.RpcHandler):
         """Activate an existing browser tab."""
         try:
             tabs = await self._browser.activate_tab(params.tab_id)
-        except BrowserTargetNotFoundError as error:
+        except BrowserTabNotFoundError as error:
             raise BrowserTabNotFound(
                 f"Browser tab not found: {params.tab_id}"
             ) from error
@@ -212,7 +273,7 @@ class BrowserRpcMethods(rpc.RpcHandler):
         """Close a browser tab and activate a remaining tab."""
         try:
             tabs = await self._browser.close_tab(params.tab_id)
-        except BrowserTargetNotFoundError as error:
+        except BrowserTabNotFoundError as error:
             raise BrowserTabNotFound(
                 f"Browser tab not found: {params.tab_id}"
             ) from error

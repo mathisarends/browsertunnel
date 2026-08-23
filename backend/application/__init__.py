@@ -1,3 +1,23 @@
-from backend.application.browser import BrowserFrame, BrowserTab, BrowserTunnel
+from backend.application.browser import (
+    BrowserEvent,
+    BrowserTab,
+    BrowserTabNotFoundError,
+    BrowserTunnel,
+    FrameReceived,
+    NavigationChanged,
+    TabsChanged,
+    TargetCrashed,
+    TargetDetached,
+)
 
-__all__ = ["BrowserFrame", "BrowserTab", "BrowserTunnel"]
+__all__ = [
+    "BrowserEvent",
+    "BrowserTab",
+    "BrowserTabNotFoundError",
+    "BrowserTunnel",
+    "FrameReceived",
+    "NavigationChanged",
+    "TabsChanged",
+    "TargetCrashed",
+    "TargetDetached",
+]

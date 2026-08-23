@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 type MouseEventType = Literal[
     "mousePressed", "mouseReleased", "mouseMoved", "mouseWheel"
@@ -18,20 +18,67 @@ class BrowserTab:
 
 
 @dataclass(frozen=True, slots=True)
-class BrowserFrame:
-    data: str
-    session_id: int
-    metadata: dict[str, Any]
+class FrameReceived:
+    data: bytes
+
+
+@dataclass(frozen=True, slots=True)
+class TabsChanged:
+    tabs: list[BrowserTab]
+
+
+@dataclass(frozen=True, slots=True)
+class NavigationChanged:
+    tab_id: str
+    title: str
+    url: str
+    loading: bool
+    can_go_back: bool
+    can_go_forward: bool
+    error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TargetCrashed:
+    tab_id: str
+    status: str
+    error_code: int
+
+
+@dataclass(frozen=True, slots=True)
+class TargetDetached:
+    tab_id: str | None
+
+
+type BrowserEvent = (
+    FrameReceived | TabsChanged | NavigationChanged | TargetCrashed | TargetDetached
+)
+
+
+class BrowserTabNotFoundError(LookupError):
+    pass
 
 
 class BrowserTunnel(ABC):
     """Application-owned port for one remotely controlled browser."""
 
     @abstractmethod
-    async def frames(self) -> AsyncIterator[BrowserFrame]: ...
+    async def events(self) -> AsyncIterator[BrowserEvent]: ...
 
     @abstractmethod
     async def navigate(self, url: str) -> None: ...
+
+    @abstractmethod
+    async def go_back(self) -> None: ...
+
+    @abstractmethod
+    async def go_forward(self) -> None: ...
+
+    @abstractmethod
+    async def reload(self, *, ignore_cache: bool = False) -> None: ...
+
+    @abstractmethod
+    async def stop_loading(self) -> None: ...
 
     @abstractmethod
     async def mouse(

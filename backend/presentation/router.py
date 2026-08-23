@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 from contextlib import suppress
 
@@ -6,23 +7,27 @@ import pyrpckit as rpc
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from backend.application import BrowserTunnel
+from backend.application import (
+    BrowserTunnel,
+    FrameReceived,
+    NavigationChanged,
+    TabsChanged,
+    TargetCrashed,
+    TargetDetached,
+)
 from backend.presentation.rpc import (
     BROWSER_PROTOCOL,
     BrowserFrameEvent,
+    BrowserNavigationEvent,
     BrowserRpcMethods,
     BrowserTabsEvent,
+    BrowserTargetCrashedEvent,
+    BrowserTargetDetachedEvent,
     tabs_result,
 )
 from backend.presentation.schemas import browser_json_schema, browser_openrpc_schema
 
 router = APIRouter(prefix="/api/browser", tags=["browser-tunnel"])
-
-_TAB_METHODS = {
-    "browser.tab.create",
-    "browser.tab.activate",
-    "browser.tab.close",
-}
 
 
 @router.get("/schema.json", include_in_schema=False)
@@ -52,27 +57,41 @@ async def browser_socket(
         async with send_lock:
             await websocket.send_json(model.model_dump(mode="json", by_alias=True))
 
-    async def stream_frames() -> None:
-        tabs = tabs_result(await browser.list_tabs())
-        await send(
-            rpc.RpcNotification(
-                method="browser.event",
-                params=BrowserTabsEvent(tabs=tabs.tabs),
-            )
-        )
-        async for frame in browser.frames():
+    async def stream_events() -> None:
+        async for event in browser.events():
+            match event:
+                case FrameReceived(data=data):
+                    params = BrowserFrameEvent(
+                        data=base64.b64encode(data).decode("ascii")
+                    )
+                case TabsChanged(tabs=tabs):
+                    params = BrowserTabsEvent(tabs=tabs_result(tabs).tabs)
+                case NavigationChanged():
+                    params = BrowserNavigationEvent(
+                        tabId=event.tab_id,
+                        title=event.title,
+                        url=event.url,
+                        loading=event.loading,
+                        canGoBack=event.can_go_back,
+                        canGoForward=event.can_go_forward,
+                        error=event.error,
+                    )
+                case TargetCrashed():
+                    params = BrowserTargetCrashedEvent(
+                        tabId=event.tab_id,
+                        status=event.status,
+                        errorCode=event.error_code,
+                    )
+                case TargetDetached():
+                    params = BrowserTargetDetachedEvent(tabId=event.tab_id)
             await send(
                 rpc.RpcNotification(
                     method="browser.event",
-                    params=BrowserFrameEvent(
-                        data=frame.data,
-                        sessionId=frame.session_id,
-                        metadata=frame.metadata,
-                    ),
+                    params=params,
                 )
             )
 
-    frame_task = asyncio.create_task(stream_frames())
+    event_task = asyncio.create_task(stream_events())
     try:
         while True:
             raw_request = await websocket.receive_text()
@@ -84,21 +103,9 @@ async def browser_socket(
             response = await server.handle(request)
             if response is not None:
                 await send(response)
-            if (
-                isinstance(request, dict)
-                and request.get("method") in _TAB_METHODS
-                and isinstance(response, rpc.RpcSuccess)
-            ):
-                tabs = tabs_result(await browser.list_tabs())
-                await send(
-                    rpc.RpcNotification(
-                        method="browser.event",
-                        params=BrowserTabsEvent(tabs=tabs.tabs),
-                    )
-                )
     except WebSocketDisconnect:
         pass
     finally:
-        frame_task.cancel()
+        event_task.cancel()
         with suppress(asyncio.CancelledError):
-            await frame_task
+            await event_task

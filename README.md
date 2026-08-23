@@ -60,11 +60,13 @@ Beispiel:
 }
 ```
 
-Screencast-Frames und Tab-Zustand sendet der Server als JSON-RPC-Notification
-`browser.event`; `params.type` ist `browser.frame` beziehungsweise
-`browser.tabs`. Die dekorierten `pyrpckit`-Methoden decken Navigation, Maus,
-Scrollen, Tastatur, Texteingabe, Clipboard sowie Tab-Liste, -Erstellung,
--Aktivierung und -Schließen ab.
+Browserereignisse sendet der Server als JSON-RPC-Notification `browser.event`.
+`params.type` unterscheidet Frames, Tab- und Navigationszustand sowie abgestürzte
+oder getrennte Targets. Frames sind im Application-Layer JPEG-Bytes und werden
+nur für den JSON-Transport als Base64 kodiert. Die dekorierten `pyrpckit`-Methoden
+decken URL-Navigation, Zurück, Vor, Neuladen, Ladestopp, Maus, Scrollen,
+Tastatur, Texteingabe, Clipboard sowie Tab-Liste, -Erstellung, -Aktivierung und
+-Schließen ab.
 
 Der Browser lässt sich mit `BROWSER_EXECUTABLE`, `BROWSER_CDP_URL`,
 `BROWSER_HEADLESS`, `BROWSER_WIDTH`, `BROWSER_HEIGHT`,
