@@ -1,6 +1,7 @@
 import "./style.css";
 import {
   BrowserClient,
+  type BrowserCursor,
   type BrowserEvent,
   type BrowserTab,
   type ClickParams,
@@ -133,10 +134,19 @@ async function renderLatestFrame(): Promise<void> {
   }
 }
 
+function applyCursor(cursor: BrowserCursor): void {
+  canvas.style.cursor = cursor;
+}
+
 function receive(event: BrowserEvent): void {
   if (event.type === "browser.frame") {
     latestFrame = event.data;
     void renderLatestFrame().catch(reportError);
+    return;
+  }
+
+  if (event.type === "browser.cursor") {
+    applyCursor(event.cursor);
     return;
   }
 

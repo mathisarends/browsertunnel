@@ -9,6 +9,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from backend.application import (
     Browser,
+    CursorChanged,
     NavigationChanged,
     TabsChanged,
     TargetCrashed,
@@ -16,6 +17,7 @@ from backend.application import (
 )
 from backend.presentation.rpc import (
     BROWSER_PROTOCOL,
+    BrowserCursorEvent,
     BrowserFrameEvent,
     BrowserNavigationEvent,
     BrowserRpcMethods,
@@ -70,6 +72,11 @@ async def browser_socket(
                         canGoBack=event.can_go_back,
                         canGoForward=event.can_go_forward,
                         error=event.error,
+                    )
+                case CursorChanged():
+                    params = BrowserCursorEvent(
+                        tabId=event.tab_id,
+                        cursor=event.cursor,
                     )
                 case TargetCrashed():
                     params = BrowserTargetCrashedEvent(

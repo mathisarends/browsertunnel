@@ -9,6 +9,7 @@ from backend.application import (
     BrowserTab,
     BrowserTabNotFoundError,
     ClickEventType,
+    CursorStyle,
     KeyEventType,
 )
 
@@ -142,6 +143,13 @@ class BrowserNavigationEvent(RpcModel):
 
 
 @rpc.event
+class BrowserCursorEvent(RpcModel):
+    type: Literal["browser.cursor"] = "browser.cursor"
+    tab_id: str = Field(alias="tabId")
+    cursor: CursorStyle
+
+
+@rpc.event
 class BrowserTargetCrashedEvent(RpcModel):
     type: Literal["browser.targetCrashed"] = "browser.targetCrashed"
     tab_id: str = Field(alias="tabId")
@@ -159,6 +167,7 @@ type BrowserEvent = (
     BrowserFrameEvent
     | BrowserTabsEvent
     | BrowserNavigationEvent
+    | BrowserCursorEvent
     | BrowserTargetCrashedEvent
     | BrowserTargetDetachedEvent
 )

@@ -17,6 +17,7 @@ from backend.application import (
     TargetDetached,
 )
 from backend.infrastructure.chrome_process import ChromeProcess
+from backend.infrastructure.cursor_event_bridge import CursorEventBridge
 from backend.infrastructure.events import BrowserEventForwarder, EventBus
 from backend.infrastructure.listener_event_bridge import ListenerEventBridge
 from backend.infrastructure.screencast_event_bridge import ScreencastEventBridge
@@ -39,6 +40,7 @@ class CdpBrowser(Browser):
             width=settings.width,
             height=settings.height,
         )
+        self._cursor_bridge = CursorEventBridge(self._event_bus)
         self._state_lock = asyncio.Lock()
         self._event_bus.on(TargetDetached, self._recover_active_target)
 
@@ -258,6 +260,7 @@ class CdpBrowser(Browser):
             await self._active_session.network.enable()
             await self._apply_viewport(self._active_session)
             await self._event_bridge.set_active_page(self._active_session, target_id)
+            await self._cursor_bridge.start(self._active_session, target_id)
             await self._screencast_bridge.start(self._active_session)
 
     async def _apply_viewport(self, session: CDPSession) -> None:
@@ -275,6 +278,7 @@ class CdpBrowser(Browser):
 
     async def _stop_active_listeners(self) -> None:
         await self._event_bridge.clear_active_page()
+        await self._cursor_bridge.stop()
         await self._screencast_bridge.stop()
 
     async def _navigate_history(self, offset: int) -> None:

@@ -2,6 +2,7 @@ import asyncio
 
 from backend.application import (
     BrowserEvent,
+    CursorChanged,
     NavigationChanged,
     TabsChanged,
     TargetCrashed,
@@ -21,6 +22,7 @@ class BrowserEventForwarder:
             NavigationChanged,
             TargetCrashed,
             TargetDetached,
+            CursorChanged,
         ):
             event_bus.on(event_type, self._forward)
 

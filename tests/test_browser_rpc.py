@@ -222,6 +222,7 @@ def test_protocol_contract_contains_methods_and_events() -> None:
     }
     assert "browser.mouse" not in methods
     assert {event["name"] for event in schema["x-rpc-events"]} == {
+        "browser.cursor",
         "browser.frame",
         "browser.navigation",
         "browser.tabs",
