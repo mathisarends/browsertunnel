@@ -15,5 +15,7 @@ if [ ! -f .env ] && [ -f .env.example ]; then
   cp .env.example .env
 fi
 
+export RELOAD="${RELOAD:-1}"
+
 echo "Backend wird auf http://localhost:${PORT:-8000} gestartet ..."
 exec uv run python -m backend.main
