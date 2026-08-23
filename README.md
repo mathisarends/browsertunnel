@@ -64,7 +64,8 @@ Browserereignisse sendet der Server als JSON-RPC-Notification `browser.event`.
 `params.type` unterscheidet Frames, Tab- und Navigationszustand sowie abgestürzte
 oder getrennte Targets. Frames sind im Application-Layer JPEG-Bytes und werden
 nur für den JSON-Transport als Base64 kodiert. Die dekorierten `pyrpckit`-Methoden
-decken URL-Navigation, Zurück, Vor, Neuladen, Ladestopp, Maus, Scrollen,
+decken URL-Navigation, Zurück, Vor, Neuladen, Ladestopp, getrennte Click- und
+Hover-Eingaben, Scrollen,
 Tastatur, Texteingabe, Clipboard sowie Tab-Liste, -Erstellung, -Aktivierung und
 -Schließen ab.
 

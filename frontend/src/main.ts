@@ -3,7 +3,8 @@ import {
   BrowserClient,
   type BrowserEvent,
   type BrowserTab,
-  type MouseMoveParams,
+  type ClickParams,
+  type HoverParams,
 } from "./api";
 
 type EventPayload = Record<string, unknown>;
@@ -27,9 +28,9 @@ const clearLogsButton = element<HTMLButtonElement>("#clear-logs");
 let tabs: BrowserTab[] = [];
 let latestFrame: string | undefined;
 let renderingFrame = false;
-let latestMouseMove: MouseMoveParams | undefined;
-let mouseMoveFrame: number | undefined;
-let mouseMoveInFlight = false;
+let latestHover: HoverParams | undefined;
+let hoverFrame: number | undefined;
+let hoverInFlight = false;
 
 function log(direction: "incoming" | "outgoing", name: string, payload: EventPayload = {}): void {
   const entry = document.createElement("li");
@@ -176,21 +177,26 @@ function mouseModifiers(event: MouseEvent): number {
   );
 }
 
-function scheduleMouseMove(params: MouseMoveParams): void {
-  latestMouseMove = params;
-  if (mouseMoveFrame !== undefined || mouseMoveInFlight) return;
+function sendClick(params: ClickParams): void {
+  log("outgoing", "browser.click", params);
+  void client.click(params).catch(reportError);
+}
 
-  mouseMoveFrame = requestAnimationFrame(() => {
-    mouseMoveFrame = undefined;
-    const next = latestMouseMove;
-    latestMouseMove = undefined;
+function scheduleHover(params: HoverParams): void {
+  latestHover = params;
+  if (hoverFrame !== undefined || hoverInFlight) return;
+
+  hoverFrame = requestAnimationFrame(() => {
+    hoverFrame = undefined;
+    const next = latestHover;
+    latestHover = undefined;
     if (!next) return;
 
-    mouseMoveInFlight = true;
-    log("outgoing", "browser.mouse", { type: "mouseMoved", ...next });
-    void client.mouseMove(next).catch(reportError).finally(() => {
-      mouseMoveInFlight = false;
-      if (latestMouseMove) scheduleMouseMove(latestMouseMove);
+    hoverInFlight = true;
+    log("outgoing", "browser.hover", next);
+    void client.hover(next).catch(reportError).finally(() => {
+      hoverInFlight = false;
+      if (latestHover) scheduleHover(latestHover);
     });
   });
 }
@@ -211,32 +217,32 @@ newTabButton.addEventListener("click", () => {
 canvas.tabIndex = 0;
 canvas.addEventListener("mousedown", (event) => {
   canvas.focus();
-  void rpc("browser.mouse", {
+  sendClick({
     type: "mousePressed",
     ...canvasPoint(event),
     button: "left",
     buttons: 1,
     clickCount: event.detail,
-  }).catch(reportError);
+  });
 });
 canvas.addEventListener("mouseup", (event) => {
-  void rpc("browser.mouse", {
+  sendClick({
     type: "mouseReleased",
     ...canvasPoint(event),
     button: "left",
     buttons: 0,
     clickCount: event.detail,
-  }).catch(reportError);
+  });
 });
 canvas.addEventListener("mousemove", (event) => {
-  scheduleMouseMove({
+  scheduleHover({
     ...canvasPoint(event),
     buttons: event.buttons,
     modifiers: mouseModifiers(event),
   });
 });
 canvas.addEventListener("mouseleave", (event) => {
-  scheduleMouseMove({
+  scheduleHover({
     ...canvasPoint(event),
     buttons: event.buttons,
     modifiers: mouseModifiers(event),

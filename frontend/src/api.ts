@@ -23,19 +23,24 @@ export type BrowserEvent =
   | { type: "browser.targetCrashed"; tabId: string; status: string; errorCode: number }
   | { type: "browser.targetDetached"; tabId: string | null };
 
-export type MouseButton = "none" | "left" | "middle" | "right" | "back" | "forward";
+export type MouseButton = "left" | "middle" | "right" | "back" | "forward";
 
-export type MouseEventParams = {
-  type: "mousePressed" | "mouseReleased" | "mouseMoved";
+export type ClickParams = {
+  type: "mousePressed" | "mouseReleased";
   x: number;
   y: number;
-  button?: MouseButton;
-  buttons?: number;
+  button: MouseButton;
+  buttons: number;
   modifiers?: number;
   clickCount?: number;
 };
 
-export type MouseMoveParams = Pick<MouseEventParams, "x" | "y" | "buttons" | "modifiers">;
+export type HoverParams = {
+  x: number;
+  y: number;
+  buttons?: number;
+  modifiers?: number;
+};
 
 type PendingRequest = {
   resolve: (value: unknown) => void;
@@ -82,17 +87,12 @@ export class BrowserClient {
     });
   }
 
-  async mouse(params: MouseEventParams): Promise<void> {
-    await this.call("browser.mouse", params);
+  async click(params: ClickParams): Promise<void> {
+    await this.call("browser.click", params);
   }
 
-  async mouseMove(params: MouseMoveParams): Promise<void> {
-    await this.mouse({
-      type: "mouseMoved",
-      button: "none",
-      clickCount: 0,
-      ...params,
-    });
+  async hover(params: HoverParams): Promise<void> {
+    await this.call("browser.hover", params);
   }
 
   private handleMessage(message: MessageEvent): void {

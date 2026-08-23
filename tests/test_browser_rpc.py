@@ -12,7 +12,8 @@ class FakeBrowser(BrowserTunnel):
     def __init__(self) -> None:
         self.navigated_to: str | None = None
         self.navigation_commands: list[tuple[str, bool | None]] = []
-        self.mouse_events: list[dict] = []
+        self.click_events: list[dict] = []
+        self.hover_events: list[dict] = []
         self.tabs = [BrowserTab("tab-1", "Example", "about:blank", True)]
 
     async def events(self) -> AsyncIterator[BrowserEvent]:
@@ -34,8 +35,11 @@ class FakeBrowser(BrowserTunnel):
     async def stop_loading(self) -> None:
         self.navigation_commands.append(("stop", None))
 
-    async def mouse(self, **kwargs) -> None:
-        self.mouse_events.append(kwargs)
+    async def click(self, **kwargs) -> None:
+        self.click_events.append(kwargs)
+
+    async def hover(self, **kwargs) -> None:
+        self.hover_events.append(kwargs)
 
     async def scroll(self, **kwargs) -> None:
         pass
@@ -131,38 +135,61 @@ async def test_json_rpc_dispatches_navigation_toolbar_commands() -> None:
 
 
 @pytest.mark.asyncio
-async def test_json_rpc_dispatches_mouse_move_for_hover_states() -> None:
+async def test_json_rpc_dispatches_separate_click_and_hover_commands() -> None:
     browser = FakeBrowser()
     server = RpcServer(BrowserRpcMethods(browser), protocol=BROWSER_PROTOCOL)
 
-    response = await server.handle(
+    click_response = await server.handle(
         {
             "jsonrpc": "2.0",
             "id": 5,
-            "method": "browser.mouse",
+            "method": "browser.click",
             "params": {
-                "type": "mouseMoved",
+                "type": "mousePressed",
+                "x": 100,
+                "y": 200,
+                "button": "left",
+                "buttons": 1,
+                "modifiers": 0,
+                "clickCount": 2,
+            },
+        }
+    )
+    hover_response = await server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "method": "browser.hover",
+            "params": {
                 "x": 123.5,
                 "y": 456.25,
-                "button": "none",
                 "buttons": 0,
                 "modifiers": 8,
-                "clickCount": 0,
             },
         }
     )
 
-    assert response is not None
-    assert response.model_dump(mode="json")["result"] == {}
-    assert browser.mouse_events == [
+    assert click_response is not None
+    assert click_response.model_dump(mode="json")["result"] == {}
+    assert hover_response is not None
+    assert hover_response.model_dump(mode="json")["result"] == {}
+    assert browser.click_events == [
         {
-            "event_type": "mouseMoved",
+            "event_type": "mousePressed",
+            "x": 100.0,
+            "y": 200.0,
+            "button": "left",
+            "buttons": 1,
+            "modifiers": 0,
+            "click_count": 2,
+        }
+    ]
+    assert browser.hover_events == [
+        {
             "x": 123.5,
             "y": 456.25,
-            "button": "none",
             "buttons": 0,
             "modifiers": 8,
-            "click_count": 0,
         }
     ]
 
@@ -170,17 +197,20 @@ async def test_json_rpc_dispatches_mouse_move_for_hover_states() -> None:
 def test_protocol_contract_contains_methods_and_events() -> None:
     schema = render_json_schema(BROWSER_PROTOCOL, title="BrowserTunnel")
     openrpc = render_openrpc(BROWSER_PROTOCOL, title="BrowserTunnel")
+    methods = {method["name"] for method in schema["x-rpc-methods"]}
 
-    assert {method["name"] for method in schema["x-rpc-methods"]} >= {
+    assert methods >= {
         "browser.navigate",
         "browser.goBack",
         "browser.goForward",
         "browser.reload",
         "browser.stopLoading",
-        "browser.mouse",
+        "browser.click",
+        "browser.hover",
         "browser.tab.create",
         "browser.clipboard.write",
     }
+    assert "browser.mouse" not in methods
     assert {event["name"] for event in schema["x-rpc-events"]} == {
         "browser.frame",
         "browser.navigation",

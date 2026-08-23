@@ -19,11 +19,12 @@ from backend.application import (
     BrowserTab,
     BrowserTabNotFoundError,
     BrowserTunnel,
+    ClickEventType,
     FrameReceived,
+    KeyEventType,
     TabsChanged,
     TargetDetached,
 )
-from backend.application.browser import KeyEventType, MouseEventType
 from backend.infrastructure.events import BrowserEventForwarder, EventBus
 from backend.infrastructure.listener_event_bridge import ListenerEventBridge
 from backend.settings import BrowserSettings
@@ -120,14 +121,14 @@ class CdpBrowserTunnel(BrowserTunnel):
     async def stop_loading(self) -> None:
         await self._session().page.stop_loading()
 
-    async def mouse(
+    async def click(
         self,
         *,
-        event_type: MouseEventType,
+        event_type: ClickEventType,
         x: float,
         y: float,
-        button: str | None,
-        buttons: int | None,
+        button: str,
+        buttons: int,
         modifiers: int,
         click_count: int,
     ) -> None:
@@ -139,6 +140,24 @@ class CdpBrowserTunnel(BrowserTunnel):
             buttons=buttons,
             modifiers=modifiers,
             click_count=click_count,
+        )
+
+    async def hover(
+        self,
+        *,
+        x: float,
+        y: float,
+        buttons: int,
+        modifiers: int,
+    ) -> None:
+        await self._session().input.dispatch_mouse_event(
+            type="mouseMoved",
+            x=x,
+            y=y,
+            button="none",
+            buttons=buttons,
+            modifiers=modifiers,
+            click_count=0,
         )
 
     async def scroll(

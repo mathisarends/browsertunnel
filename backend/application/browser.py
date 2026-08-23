@@ -1,12 +1,19 @@
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Literal
+from enum import StrEnum
 
-type MouseEventType = Literal[
-    "mousePressed", "mouseReleased", "mouseMoved", "mouseWheel"
-]
-type KeyEventType = Literal["keyDown", "keyUp", "rawKeyDown", "char"]
+
+class ClickEventType(StrEnum):
+    PRESSED = "mousePressed"
+    RELEASED = "mouseReleased"
+
+
+class KeyEventType(StrEnum):
+    DOWN = "keyDown"
+    UP = "keyUp"
+    RAW_DOWN = "rawKeyDown"
+    CHAR = "char"
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,16 +88,26 @@ class BrowserTunnel(ABC):
     async def stop_loading(self) -> None: ...
 
     @abstractmethod
-    async def mouse(
+    async def click(
         self,
         *,
-        event_type: MouseEventType,
+        event_type: ClickEventType,
         x: float,
         y: float,
-        button: str | None,
-        buttons: int | None,
+        button: str,
+        buttons: int,
         modifiers: int,
         click_count: int,
+    ) -> None: ...
+
+    @abstractmethod
+    async def hover(
+        self,
+        *,
+        x: float,
+        y: float,
+        buttons: int,
+        modifiers: int,
     ) -> None: ...
 
     @abstractmethod

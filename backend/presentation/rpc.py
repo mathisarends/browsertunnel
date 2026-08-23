@@ -4,7 +4,13 @@ from typing import Literal
 import pyrpckit as rpc
 from pydantic import BaseModel, ConfigDict, Field
 
-from backend.application import BrowserTab, BrowserTabNotFoundError, BrowserTunnel
+from backend.application import (
+    BrowserTab,
+    BrowserTabNotFoundError,
+    BrowserTunnel,
+    ClickEventType,
+    KeyEventType,
+)
 
 
 class RpcModel(BaseModel):
@@ -17,7 +23,8 @@ class BrowserRpcMethod(StrEnum):
     GO_FORWARD = "browser.goForward"
     RELOAD = "browser.reload"
     STOP_LOADING = "browser.stopLoading"
-    MOUSE = "browser.mouse"
+    CLICK = "browser.click"
+    HOVER = "browser.hover"
     SCROLL = "browser.scroll"
     KEY = "browser.key"
     INSERT_TEXT = "browser.text.insert"
@@ -45,14 +52,21 @@ class ReloadParams(RpcModel):
     ignore_cache: bool = Field(default=False, alias="ignoreCache")
 
 
-class MouseParams(RpcModel):
-    type: Literal["mousePressed", "mouseReleased", "mouseMoved"]
+class ClickParams(RpcModel):
+    type: ClickEventType
     x: float
     y: float
-    button: Literal["none", "left", "middle", "right", "back", "forward"] | None = None
-    buttons: int | None = Field(default=None, ge=0)
+    button: Literal["left", "middle", "right", "back", "forward"]
+    buttons: int = Field(ge=0)
     modifiers: int = Field(default=0, ge=0)
     click_count: int = Field(default=1, alias="clickCount", ge=0)
+
+
+class HoverParams(RpcModel):
+    x: float
+    y: float
+    buttons: int = Field(default=0, ge=0)
+    modifiers: int = Field(default=0, ge=0)
 
 
 class ScrollParams(RpcModel):
@@ -63,7 +77,7 @@ class ScrollParams(RpcModel):
 
 
 class KeyParams(RpcModel):
-    type: Literal["keyDown", "keyUp", "rawKeyDown", "char"]
+    type: KeyEventType
     key: str
     code: str = ""
     text: str | None = None
@@ -192,10 +206,10 @@ class BrowserRpcMethods(rpc.RpcHandler):
         await self._browser.stop_loading()
         return EmptyResult()
 
-    @rpc.method(BrowserRpcMethod.MOUSE)
-    async def mouse(self, params: MouseParams) -> EmptyResult:
-        """Dispatch a mouse event to the active tab."""
-        await self._browser.mouse(
+    @rpc.method(BrowserRpcMethod.CLICK)
+    async def click(self, params: ClickParams) -> EmptyResult:
+        """Dispatch a mouse button event to the active tab."""
+        await self._browser.click(
             event_type=params.type,
             x=params.x,
             y=params.y,
@@ -203,6 +217,17 @@ class BrowserRpcMethods(rpc.RpcHandler):
             buttons=params.buttons,
             modifiers=params.modifiers,
             click_count=params.click_count,
+        )
+        return EmptyResult()
+
+    @rpc.method(BrowserRpcMethod.HOVER)
+    async def hover(self, params: HoverParams) -> EmptyResult:
+        """Move the pointer in the active tab to update hover state."""
+        await self._browser.hover(
+            x=params.x,
+            y=params.y,
+            buttons=params.buttons,
+            modifiers=params.modifiers,
         )
         return EmptyResult()
 
