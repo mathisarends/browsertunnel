@@ -2,9 +2,11 @@
 
 Mirrors a real Chromium tab into a web page. The backend drives the tab over
 the Chrome DevTools Protocol, streams its frames to a `<canvas>`, and replays
-the viewer's mouse, keyboard, scroll, and clipboard actions back onto it.
-Feels like a remote desktop for one tab, but it's just JSON-RPC over a
-WebSocket — no video codec involved.
+the viewer's input back onto it. No video codec, just JSON-RPC over a
+WebSocket.
+
+Learning project, not a hardened product: no auth, no rate limiting. It's a
+reference for the core idea, not something to deploy as is.
 
 ## Architecture
 
@@ -25,38 +27,36 @@ WebSocket — no video codec involved.
                                                                     └────────────────────┘
 ```
 
-**Rendering.** The tab's screencast is pushed frame by frame as JSON-RPC
-notifications and drawn onto a 1600×900 canvas. No iframe, no embedded
-browser engine, no cross-origin headaches — just a fast-moving image.
+- The tab's screencast comes in frame by frame and gets drawn straight onto
+  the canvas. No iframe, no embedded browser engine.
+- The tab only exists on the server. Every DOM event the viewer triggers on
+  the canvas is translated into a CDP input command and replayed on the real
+  tab, so it looks like a real user interacting with it.
+- `backend/application` defines what a browser can do, `backend/infrastructure/cdp_browser`
+  implements that over CDP, `backend/presentation` exposes it as JSON-RPC.
+  Each layer can be swapped without touching the others.
+- One socket, both directions running at once: requests go one way, a
+  notification stream (frames, tab/nav/cursor state) goes the other.
 
-**Input is imitated, not embedded.** The tab only exists on the server. Every
-click, drag, scroll, and keystroke the user does on the canvas becomes a DOM
-event, gets translated into a CDP input command, and gets replayed on the
-mirrored tab. To the tab, that input looks exactly like it came from a real
-user — which is what makes this work on arbitrary sites without any
-per-site integration.
+## Tunneled events
 
-**Layering.** `backend/application` defines what a browser can do
-(`navigation`, `input`, `clipboard`, `tabs`); `backend/infrastructure/cdp_browser`
-implements that over CDP; `backend/presentation` exposes it as JSON-RPC and
-owns the WebSocket session. Swapping the CDP adapter, or the RPC transport,
-shouldn't touch the other two.
+**Navigation:** navigate to URL, back, forward, reload (with optional cache
+bypass), stop loading.
 
-**One socket, both directions at once.** Requests (`browser.nav.*`,
-`browser.input.*`, ...) go one way; a `browser.event` notification stream
-(tab/navigation/cursor state, crashes, detach) and the frame stream go the
-other, both running as background tasks for as long as the connection is
-open.
+**Mouse:** down, move, up, with button, modifier, and click-count tracking
+(covers drags and held buttons), plus scroll.
 
-**Why this exists.** This is a learning project, not a hardened product —
-there's no auth on the WebSocket, no rate limiting, none of the things a
-real deployment would need. Treat it as a reference for the core idea: how
-you'd mirror and control a browser tab remotely, stripped down to that one
-concept.
+**Keyboard:** key down/up, raw key down, char events, text insertion, and
+paste.
 
-The JSON-RPC plumbing and the CDP client are pulled in as libraries
-(`pyrpckit`, `cdpify`), not written here — the interesting part is how the
-tab is mirrored and controlled, not the wire format.
+**Clipboard:** copy, read, write.
+
+**Tabs:** list, create, activate, close. Every tab command replies with the
+full tab list.
+
+**Pushed to the client:** screencast frames, tab list changes, navigation
+state (title, URL, loading, can-go-back/forward, error), cursor style, and
+target crashed/detached.
 
 ## Setup
 
@@ -85,11 +85,11 @@ uv run ruff format . # format
 npm run build        # type-check and build the frontend
 ```
 
-The frontend can also just be started with `npm run dev` after `npm install`
-— `predev` regenerates schemas and the RPC client first. Vite hot-reloads on
+The frontend can also just be started with `npm run dev` after `npm install`.
+`predev` regenerates schemas and the RPC client first. Vite hot-reloads on
 HTML/CSS/TS changes and proxies `/api` to the backend on port 8000. The
-generated client lives in the workspace package
-`packages/browser-rpc-client`; `npm run check:generated` flags a stale one.
+generated client lives in the workspace package `packages/browser-rpc-client`;
+`npm run check:generated` flags a stale one.
 
 ## Backend protocol
 
@@ -110,9 +110,7 @@ One WebSocket, JSON-RPC 2.0:
 
 Server-pushed events arrive as `browser.event`; `params.type` tells frames
 apart from tab/navigation state and crashed/detached targets. Frames are
-JPEG, base64-encoded for the JSON transport. Methods cover navigation
-(back/forward/reload/stop), mouse/scroll/keyboard input, clipboard, and tab
-list/create/activate/close.
+JPEG, base64-encoded for the JSON transport.
 
 Configure the browser via `BROWSER_EXECUTABLE`, `BROWSER_CDP_URL`,
 `BROWSER_HEADLESS`, `BROWSER_WIDTH`, `BROWSER_HEIGHT`,
