@@ -26,6 +26,7 @@ const addressInput = element<HTMLInputElement>("#address-input");
 const tabList = element<HTMLDivElement>("#tab-list");
 const newTabButton = element<HTMLButtonElement>("#new-tab");
 const activeTabStatus = element<HTMLSpanElement>("#active-tab-status");
+const cursorStatus = element<HTMLSpanElement>("#cursor-status");
 const eventLog = element<HTMLOListElement>("#event-log");
 const emptyLog = element<HTMLParagraphElement>("#empty-log");
 const clearLogsButton = element<HTMLButtonElement>("#clear-logs");
@@ -147,6 +148,7 @@ async function renderLatestFrame(): Promise<void> {
 
 function applyCursor(cursor: BrowserCursor): void {
   canvas.style.cursor = cursor;
+  cursorStatus.textContent = `cursor: ${cursor}`;
 }
 
 function receive(event: BrowserEvent): void {
@@ -158,6 +160,7 @@ function receive(event: BrowserEvent): void {
 
   if (event.type === "browser.cursor") {
     applyCursor(event.cursor);
+    log("incoming", event.type, { cursor: event.cursor });
     return;
   }
 

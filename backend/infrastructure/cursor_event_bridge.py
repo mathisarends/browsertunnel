@@ -18,13 +18,6 @@ _OBSERVER_SOURCE = """
   const report = window.__BINDING__;
   if (typeof report !== "function") return;
 
-  let reported = null;
-  const publish = (cursor) => {
-    if (cursor === reported) return;
-    reported = cursor;
-    report(cursor);
-  };
-
   const range = document.createRange();
   const overText = (element, x, y) => {
     for (const node of element.childNodes) {
@@ -52,10 +45,9 @@ _OBSERVER_SOURCE = """
 
   addEventListener(
     "mousemove",
-    (event) => publish(resolve(event.clientX, event.clientY)),
+    (event) => report(resolve(event.clientX, event.clientY)),
     { capture: true, passive: true },
   );
-  publish("default");
 })();
 """.replace("__BINDING__", BINDING_NAME)
 
@@ -64,8 +56,13 @@ class CursorEventBridge:
     """Mirror the active page's CSS cursor onto the application event bus.
 
     A page-side observer resolves the cursor under the pointer and reports it
-    through a CDP binding, so a message crosses the wire only when the cursor
-    actually changes instead of once per pointer move.
+    through a CDP binding, which keeps the work out of the command path that
+    querying the computed style per pointer move would need.
+
+    Every frame of the page runs its own observer, so deduplication belongs
+    here rather than in the observer: a frame that suppressed a repeat of what
+    it last reported would keep silent about a cursor another frame has since
+    replaced, leaving the viewer stuck on a stale cursor.
     """
 
     def __init__(self, event_bus: EventBus) -> None:
