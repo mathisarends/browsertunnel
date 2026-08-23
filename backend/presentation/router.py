@@ -5,7 +5,6 @@ from contextlib import suppress
 import pyrpckit as rpc
 from dishka.integrations.fastapi import FromDishka, inject
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pyrpckit.schema import render_json_schema, render_openrpc
 
 from backend.application import BrowserTunnel
 from backend.presentation.rpc import (
@@ -15,6 +14,7 @@ from backend.presentation.rpc import (
     BrowserTabsEvent,
     tabs_result,
 )
+from backend.presentation.schemas import browser_json_schema, browser_openrpc_schema
 
 router = APIRouter(prefix="/api/browser", tags=["browser-tunnel"])
 
@@ -27,20 +27,12 @@ _TAB_METHODS = {
 
 @router.get("/schema.json", include_in_schema=False)
 async def json_rpc_schema() -> dict:
-    return render_json_schema(
-        BROWSER_PROTOCOL,
-        title="BrowserTunnel JSON-RPC Protocol",
-        schema_id="/api/browser/schema.json",
-    )
+    return browser_json_schema()
 
 
 @router.get("/openrpc.json", include_in_schema=False)
 async def open_rpc_schema() -> dict:
-    return render_openrpc(
-        BROWSER_PROTOCOL,
-        title="BrowserTunnel",
-        servers=({"name": "browser-tunnel", "url": "/api/browser/ws"},),
-    )
+    return browser_openrpc_schema()
 
 
 @router.websocket("/ws")

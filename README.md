@@ -16,14 +16,15 @@ uv run pre-commit install
 ## Development
 
 ```bash
-# Backend starten (startet Chromium im Lifespan)
-uv run python -m backend.main
+# Backend starten (richtet Abhängigkeiten und .env bei Bedarf ein)
+sh scripts/start-backend.sh
 
 # Frontend starten (installiert fehlende Pakete automatisch)
 sh scripts/start-frontend.sh
 
 # Danach im Browser öffnen: http://localhost:5173
 
+sh scripts/generate-schemas.sh # JSON-Schema und OpenRPC nach schemas/ schreiben
 uv run pytest        # tests
 uv run ruff check .  # lint
 uv run ruff format . # format

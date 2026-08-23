@@ -13,6 +13,9 @@ venv/
 # uv
 .uv/
 
+# Generated schemas
+schemas/
+
 # Testing / coverage
 .pytest_cache/
 .mypy_cache/
