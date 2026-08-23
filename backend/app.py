@@ -4,13 +4,13 @@ from fastapi import FastAPI
 
 from backend.infrastructure.provider import BrowserProvider
 from backend.lifespan import lifespan
-from backend.presentation import router
+from backend.presentation import SessionProvider, router
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="BrowserTunnel", version="0.1.0", lifespan=lifespan)
     app.include_router(router)
-    setup_dishka(make_async_container(BrowserProvider()), app)
+    setup_dishka(make_async_container(BrowserProvider(), SessionProvider()), app)
     return app
 
 
