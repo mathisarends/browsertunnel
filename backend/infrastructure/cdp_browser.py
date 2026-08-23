@@ -1,18 +1,14 @@
 import asyncio
-import base64
 import json
-import logging
 import shutil
 import subprocess
 import tempfile
 import time
 from collections.abc import AsyncIterator
-from contextlib import suppress
 from pathlib import Path
 
 from cdpify import CDPSession, Client
 from cdpify.domains.browser.types import PermissionDescriptor
-from cdpify.domains.page.events import PageEvent, ScreencastFrameEvent
 
 from backend.application import (
     Browser,
@@ -27,9 +23,8 @@ from backend.application import (
 )
 from backend.infrastructure.events import BrowserEventForwarder, EventBus
 from backend.infrastructure.listener_event_bridge import ListenerEventBridge
+from backend.infrastructure.screencast_event_bridge import ScreencastEventBridge
 from backend.settings import BrowserSettings
-
-logger = logging.getLogger(__name__)
 
 
 class BrowserStartupError(RuntimeError):
@@ -47,7 +42,12 @@ class CdpBrowser(Browser):
         self._event_bus = EventBus()
         self._event_bridge = ListenerEventBridge(self._event_bus)
         self._browser_event_forwarder = BrowserEventForwarder(self._event_bus)
-        self._frame_task: asyncio.Task[None] | None = None
+        self._screencast_bridge = ScreencastEventBridge(
+            self._event_bus,
+            quality=settings.screencast_quality,
+            width=settings.width,
+            height=settings.height,
+        )
         self._state_lock = asyncio.Lock()
         self._event_bus.on(TargetDetached, self._recover_active_target)
 
@@ -102,21 +102,17 @@ class CdpBrowser(Browser):
             if navigation is not None:
                 queue.put_nowait(navigation)
             while True:
-                event = await queue.get()
-                if not isinstance(event, ScreencastFrame):
-                    yield event
+                yield await queue.get()
         finally:
             self._browser_event_forwarder.unsubscribe(queue)
 
     async def screencast_frames(self) -> AsyncIterator[ScreencastFrame]:
-        queue = self._browser_event_forwarder.subscribe()
+        queue = self._screencast_bridge.subscribe()
         try:
             while True:
-                event = await queue.get()
-                if isinstance(event, ScreencastFrame):
-                    yield event
+                yield await queue.get()
         finally:
-            self._browser_event_forwarder.unsubscribe(queue)
+            self._screencast_bridge.unsubscribe(queue)
 
     async def navigate(self, url: str) -> None:
         await self._session().page.navigate(url=url)
@@ -280,49 +276,11 @@ class CdpBrowser(Browser):
             await self._active_session.page.enable()
             await self._active_session.network.enable()
             await self._event_bridge.set_active_page(self._active_session, target_id)
-            await self._start_active_listeners()
-
-    async def _start_active_listeners(self) -> None:
-        session = self._session()
-        await session.page.start_screencast(
-            format="jpeg",
-            quality=self._settings.screencast_quality,
-            max_width=self._settings.width,
-            max_height=self._settings.height,
-        )
-        self._frame_task = asyncio.create_task(
-            self._pump_frames(session), name="active-page:screencast"
-        )
+            await self._screencast_bridge.start(self._active_session)
 
     async def _stop_active_listeners(self) -> None:
-        session = self._active_session
         await self._event_bridge.clear_active_page()
-        frame_task = self._frame_task
-        self._frame_task = None
-        if frame_task is not None and not frame_task.done():
-            frame_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await frame_task
-        if session is not None:
-            with suppress(Exception):
-                await session.page.stop_screencast()
-
-    async def _pump_frames(self, session: CDPSession) -> None:
-        try:
-            async for event in session.listen(
-                PageEvent.SCREENCAST_FRAME, ScreencastFrameEvent
-            ):
-                self._browser_event_forwarder.publish(
-                    ScreencastFrame(base64.b64decode(event.data))
-                )
-                await session.page.screencast_frame_ack(session_id=event.session_id)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("CDP screencast stopped unexpectedly")
-        finally:
-            with suppress(Exception):
-                await session.page.stop_screencast()
+        await self._screencast_bridge.stop()
 
     async def _navigate_history(self, offset: int) -> None:
         history = await self._session().page.get_navigation_history()

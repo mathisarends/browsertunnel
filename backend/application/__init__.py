@@ -1,7 +1,6 @@
 from backend.application.browser import (
     Browser,
     BrowserEvent,
-    BrowserStreamItem,
     BrowserTab,
     BrowserTabNotFoundError,
     ClickEventType,
@@ -18,7 +17,6 @@ __all__ = [
     "BrowserTab",
     "BrowserTabNotFoundError",
     "Browser",
-    "BrowserStreamItem",
     "ClickEventType",
     "KeyEventType",
     "NavigationChanged",

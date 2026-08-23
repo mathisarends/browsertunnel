@@ -58,7 +58,6 @@ class TargetDetached:
 
 
 type BrowserEvent = TabsChanged | NavigationChanged | TargetCrashed | TargetDetached
-type BrowserStreamItem = BrowserEvent | ScreencastFrame
 
 
 class BrowserTabNotFoundError(LookupError):
