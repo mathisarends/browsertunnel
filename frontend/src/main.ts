@@ -3,18 +3,17 @@ import {
   BrowserTunnelClient,
   WebSocketRpcTransport,
   type BrowserEvent,
-  type ClickParams,
   type CursorStyle as BrowserCursor,
-  type HoverParams,
+  type MouseParams,
   type RpcTransport,
   type TabResult as BrowserTab,
 } from "@browsertunnel/browser-rpc-client";
 
 type EventPayload = Record<string, unknown>;
-type HoverPoint = Pick<HoverParams, "x" | "y">;
+type MousePoint = Pick<MouseParams, "x" | "y">;
 
-const HOVER_LOG_IDLE_MS = 250;
-const HOVER_METHOD = "browser.input.hover";
+const MOUSE_LOG_IDLE_MS = 250;
+const MOUSE_METHOD = "browser.input.mouse";
 const MAX_LOG_ENTRIES = 200;
 const KEPT_LOG_ENTRIES = 150;
 
@@ -38,25 +37,32 @@ const clearLogsButton = element<HTMLButtonElement>("#clear-logs");
 let tabs: BrowserTab[] = [];
 let latestFrame: string | undefined;
 let renderingFrame = false;
-let latestHover: HoverParams | undefined;
-let hoverFrame: number | undefined;
-let hoverInFlight = false;
-let hoverLogTimer: ReturnType<typeof setTimeout> | undefined;
-let hoverLogStart: HoverPoint | undefined;
-let hoverLogEnd: HoverPoint | undefined;
-let hoverLogMoves = 0;
-let lastHoverPoint: HoverPoint | undefined;
+let latestMouseMove: MouseParams | undefined;
+let mouseMoveFrame: number | undefined;
+let mouseInputTail: Promise<void> = Promise.resolve();
+let mouseLogTimer: ReturnType<typeof setTimeout> | undefined;
+let mouseLogStart: MousePoint | undefined;
+let mouseLogEnd: MousePoint | undefined;
+let mouseLogMoves = 0;
+let lastMousePoint: MousePoint | undefined;
 let lastLoggedCursor: BrowserCursor | undefined;
 
 // Erst ab MAX_LOG_ENTRIES kappen, dafür gleich auf KEPT_LOG_ENTRIES herunter,
 // damit nicht bei jedem Event ein einzelner Knoten aus dem DOM fällt.
 function pruneLog(): void {
   if (eventLog.childElementCount <= MAX_LOG_ENTRIES) return;
-  const stale = Array.from(eventLog.children).slice(0, eventLog.childElementCount - KEPT_LOG_ENTRIES);
+  const stale = Array.from(eventLog.children).slice(
+    0,
+    eventLog.childElementCount - KEPT_LOG_ENTRIES,
+  );
   for (const entry of stale) entry.remove();
 }
 
-function log(direction: "incoming" | "outgoing", name: string, payload: EventPayload = {}): void {
+function log(
+  direction: "incoming" | "outgoing",
+  name: string,
+  payload: EventPayload = {},
+): void {
   const entry = document.createElement("li");
   entry.className = `log-entry ${direction}`;
   const meta = document.createElement("div");
@@ -66,7 +72,9 @@ function log(direction: "incoming" | "outgoing", name: string, payload: EventPay
   const eventName = document.createElement("strong");
   eventName.textContent = name;
   const timestamp = document.createElement("time");
-  timestamp.textContent = new Date().toLocaleTimeString("de-DE", { hour12: false });
+  timestamp.textContent = new Date().toLocaleTimeString("de-DE", {
+    hour12: false,
+  });
   const data = document.createElement("pre");
   data.textContent = JSON.stringify(payload, null, 2);
   meta.append(directionLabel, eventName, timestamp);
@@ -121,14 +129,16 @@ function renderTabs(): void {
       close.textContent = "×";
       close.addEventListener("click", (event) => {
         event.stopPropagation();
-        void client.browser.tab.close({ tabId: tab.id }).then((result) =>
-          applyTabs(result.tabs),
-        ).catch(reportError);
+        void client.browser.tab
+          .close({ tabId: tab.id })
+          .then((result) => applyTabs(result.tabs))
+          .catch(reportError);
       });
       tabElement.addEventListener("click", () => {
-        void client.browser.tab.activate({ tabId: tab.id }).then((result) =>
-          applyTabs(result.tabs),
-        ).catch(reportError);
+        void client.browser.tab
+          .activate({ tabId: tab.id })
+          .then((result) => applyTabs(result.tabs))
+          .catch(reportError);
       });
       tabElement.append(favicon, title, close);
       return tabElement;
@@ -144,8 +154,12 @@ async function renderLatestFrame(): Promise<void> {
       const encoded = latestFrame;
       latestFrame = undefined;
       const binary = atob(encoded);
-      const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-      const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/jpeg" }));
+      const bytes = Uint8Array.from(binary, (character) =>
+        character.charCodeAt(0),
+      );
+      const bitmap = await createImageBitmap(
+        new Blob([bytes], { type: "image/jpeg" }),
+      );
       if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
         canvas.width = bitmap.width;
         canvas.height = bitmap.height;
@@ -184,7 +198,9 @@ function receive(event: BrowserEvent): void {
     applyTabs(event.tabs);
   } else if (event.type === "browser.navigation") {
     tabs = tabs.map((tab) =>
-      tab.id === event.tabId ? { ...tab, title: event.title, url: event.url } : tab,
+      tab.id === event.tabId
+        ? { ...tab, title: event.title, url: event.url }
+        : tab,
     );
     if (activeTab()?.id === event.tabId) {
       addressInput.value = event.url;
@@ -200,8 +216,9 @@ class LoggingRpcTransport implements RpcTransport {
   constructor(private readonly transport: RpcTransport) {}
 
   request<TResult>(method: string, params?: object): Promise<TResult> {
-    // Hover feuert pro Frame; geloggt wird stattdessen die gesettelte Bewegung.
-    if (method !== HOVER_METHOD) log("outgoing", method, (params ?? {}) as EventPayload);
+    // Mouse-Moves feuern pro Frame; geloggt wird stattdessen die gesettelte Bewegung.
+    if (method !== MOUSE_METHOD)
+      log("outgoing", method, (params ?? {}) as EventPayload);
     return this.transport.request<TResult>(method, params);
   }
 
@@ -217,10 +234,13 @@ class LoggingRpcTransport implements RpcTransport {
 const socketUrl = new URL("/api/browser/ws", window.location.href);
 socketUrl.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 const socketTransport = new WebSocketRpcTransport(socketUrl);
-const client = new BrowserTunnelClient(new LoggingRpcTransport(socketTransport));
+const client = new BrowserTunnelClient(
+  new LoggingRpcTransport(socketTransport),
+);
 
 async function receiveNotifications(): Promise<void> {
-  for await (const notification of client.notifications()) receive(notification.params);
+  for await (const notification of client.notifications())
+    receive(notification.params);
 }
 
 function canvasPoint(event: MouseEvent | WheelEvent): { x: number; y: number } {
@@ -231,7 +251,7 @@ function canvasPoint(event: MouseEvent | WheelEvent): { x: number; y: number } {
   };
 }
 
-function mouseModifiers(event: MouseEvent): number {
+function inputModifiers(event: MouseEvent | KeyboardEvent): number {
   return (
     Number(event.altKey) +
     Number(event.ctrlKey) * 2 +
@@ -240,126 +260,269 @@ function mouseModifiers(event: MouseEvent): number {
   );
 }
 
-function sendClick(params: ClickParams): void {
-  void client.browser.input.click(params).catch(reportError);
+function enqueueMouse(params: MouseParams): void {
+  mouseInputTail = mouseInputTail
+    .then(() => client.browser.input.mouse(params))
+    .catch(reportError);
 }
 
-function documentHover(params: HoverParams): void {
+function documentMouseMove(params: MouseParams): void {
   const point = { x: params.x, y: params.y };
-  hoverLogStart ??= lastHoverPoint ?? point;
-  hoverLogEnd = point;
-  hoverLogMoves += 1;
-  lastHoverPoint = point;
+  mouseLogStart ??= lastMousePoint ?? point;
+  mouseLogEnd = point;
+  mouseLogMoves += 1;
+  lastMousePoint = point;
 
-  if (hoverLogTimer !== undefined) clearTimeout(hoverLogTimer);
-  hoverLogTimer = setTimeout(() => {
-    hoverLogTimer = undefined;
-    if (!hoverLogStart || !hoverLogEnd) return;
+  if (mouseLogTimer !== undefined) clearTimeout(mouseLogTimer);
+  mouseLogTimer = setTimeout(() => {
+    mouseLogTimer = undefined;
+    if (!mouseLogStart || !mouseLogEnd) return;
 
-    log("outgoing", HOVER_METHOD, {
-      from: hoverLogStart,
-      to: hoverLogEnd,
-      moves: hoverLogMoves,
+    log("outgoing", MOUSE_METHOD, {
+      from: mouseLogStart,
+      to: mouseLogEnd,
+      moves: mouseLogMoves,
     });
-    hoverLogStart = undefined;
-    hoverLogEnd = undefined;
-    hoverLogMoves = 0;
-  }, HOVER_LOG_IDLE_MS);
+    mouseLogStart = undefined;
+    mouseLogEnd = undefined;
+    mouseLogMoves = 0;
+  }, MOUSE_LOG_IDLE_MS);
 }
 
-function scheduleHover(params: HoverParams): void {
-  documentHover(params);
-  latestHover = params;
-  queueHover();
+function scheduleMouseMove(params: MouseParams): void {
+  documentMouseMove(params);
+  latestMouseMove = params;
+  if (mouseMoveFrame !== undefined) return;
+  mouseMoveFrame = requestAnimationFrame(flushMouseMove);
 }
 
-function queueHover(): void {
-  if (hoverFrame !== undefined || hoverInFlight) return;
-
-  hoverFrame = requestAnimationFrame(() => {
-    hoverFrame = undefined;
-    const next = latestHover;
-    latestHover = undefined;
-    if (!next) return;
-
-    hoverInFlight = true;
-    void client.browser.input.hover(next).catch(reportError).finally(() => {
-      hoverInFlight = false;
-      if (latestHover) queueHover();
-    });
-  });
+function flushMouseMove(): void {
+  if (mouseMoveFrame !== undefined) cancelAnimationFrame(mouseMoveFrame);
+  mouseMoveFrame = undefined;
+  const next = latestMouseMove;
+  latestMouseMove = undefined;
+  if (next) enqueueMouse(next);
 }
 
 addressForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const value = addressInput.value.trim();
-  if (value) void client.browser.nav.navigate({ url: normalizeUrl(value) }).catch(reportError);
+  if (value)
+    void client.browser.nav
+      .navigate({ url: normalizeUrl(value) })
+      .catch(reportError);
 });
 
 newTabButton.addEventListener("click", () => {
-  void client.browser.tab.create({ url: "about:blank" }).then((result) => {
-    applyTabs(result.tabs);
-    addressInput.focus();
-  }).catch(reportError);
+  void client.browser.tab
+    .create({ url: "about:blank" })
+    .then((result) => {
+      applyTabs(result.tabs);
+      addressInput.focus();
+    })
+    .catch(reportError);
 });
 
 canvas.tabIndex = 0;
+const MOUSE_BUTTONS = ["left", "middle", "right", "back", "forward"] as const;
+const pressedMouseButtons = new Map<number, MouseParams["button"]>();
+
+function mouseButton(button: number): MouseParams["button"] {
+  return MOUSE_BUTTONS[button] ?? "none";
+}
+
 canvas.addEventListener("mousedown", (event) => {
+  event.preventDefault();
   canvas.focus();
-  sendClick({
-    type: "mousePressed",
+  pressedMouseButtons.set(event.button, mouseButton(event.button));
+  flushMouseMove();
+  enqueueMouse({
+    type: "mouseDown",
     ...canvasPoint(event),
-    button: "left",
-    buttons: 1,
-    clickCount: event.detail,
-  });
-});
-canvas.addEventListener("mouseup", (event) => {
-  sendClick({
-    type: "mouseReleased",
-    ...canvasPoint(event),
-    button: "left",
-    buttons: 0,
-    clickCount: event.detail,
-  });
-});
-canvas.addEventListener("mousemove", (event) => {
-  scheduleHover({
-    ...canvasPoint(event),
+    button: mouseButton(event.button),
     buttons: event.buttons,
-    modifiers: mouseModifiers(event),
+    modifiers: inputModifiers(event),
+    clickCount: event.detail,
   });
+});
+
+window.addEventListener("mouseup", (event) => {
+  const button = pressedMouseButtons.get(event.button);
+  if (button === undefined) return;
+  event.preventDefault();
+  flushMouseMove();
+  enqueueMouse({
+    type: "mouseUp",
+    ...canvasPoint(event),
+    button,
+    buttons: event.buttons,
+    modifiers: inputModifiers(event),
+    clickCount: event.detail,
+  });
+  pressedMouseButtons.delete(event.button);
+});
+
+function forwardMouseMove(event: MouseEvent): void {
+  scheduleMouseMove({
+    type: "mouseMove",
+    ...canvasPoint(event),
+    button: "none",
+    buttons: event.buttons,
+    modifiers: inputModifiers(event),
+    clickCount: 0,
+  });
+}
+
+canvas.addEventListener("mousemove", (event) => {
+  if (pressedMouseButtons.size === 0) forwardMouseMove(event);
 });
 canvas.addEventListener("mouseleave", (event) => {
-  scheduleHover({
-    ...canvasPoint(event),
-    buttons: event.buttons,
-    modifiers: mouseModifiers(event),
-  });
+  if (pressedMouseButtons.size === 0) forwardMouseMove(event);
 });
+window.addEventListener("mousemove", (event) => {
+  if (pressedMouseButtons.size > 0) forwardMouseMove(event);
+});
+window.addEventListener("blur", () => {
+  if (pressedMouseButtons.size === 0) return;
+  flushMouseMove();
+  const point = lastMousePoint ?? { x: 0, y: 0 };
+  for (const button of pressedMouseButtons.values()) {
+    enqueueMouse({
+      type: "mouseUp",
+      ...point,
+      button,
+      buttons: 0,
+      clickCount: 0,
+    });
+  }
+  pressedMouseButtons.clear();
+});
+canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 canvas.addEventListener(
   "wheel",
   (event) => {
     event.preventDefault();
-    void client.browser.input.scroll({
-      ...canvasPoint(event),
-      deltaX: event.deltaX,
-      deltaY: event.deltaY,
-    }).catch(reportError);
+    void client.browser.input
+      .scroll({
+        ...canvasPoint(event),
+        deltaX: event.deltaX,
+        deltaY: event.deltaY,
+      })
+      .catch(reportError);
   },
   { passive: false },
 );
 function isPasteShortcut(event: KeyboardEvent): boolean {
-  return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "v";
+  return (
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    event.key.toLowerCase() === "v"
+  );
 }
 
 function isCopyShortcut(event: KeyboardEvent): boolean {
-  return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "c";
+  return (
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    event.key.toLowerCase() === "c"
+  );
 }
 
-// Forwarding the key events alone never copies: Chrome only runs the copy
-// command when it is dispatched explicitly, and the copied text then lives in
-// the container's clipboard until we mirror it onto the viewer's.
+const WINDOWS_VIRTUAL_KEY_BY_CODE: Readonly<Record<string, number>> = {
+  Backspace: 8,
+  Tab: 9,
+  Enter: 13,
+  NumpadEnter: 13,
+  ShiftLeft: 16,
+  ShiftRight: 16,
+  ControlLeft: 17,
+  ControlRight: 17,
+  AltLeft: 18,
+  AltRight: 18,
+  Pause: 19,
+  CapsLock: 20,
+  Escape: 27,
+  Space: 32,
+  PageUp: 33,
+  PageDown: 34,
+  End: 35,
+  Home: 36,
+  ArrowLeft: 37,
+  ArrowUp: 38,
+  ArrowRight: 39,
+  ArrowDown: 40,
+  Insert: 45,
+  Delete: 46,
+  MetaLeft: 91,
+  MetaRight: 92,
+  ContextMenu: 93,
+  NumpadMultiply: 106,
+  NumpadAdd: 107,
+  NumpadSubtract: 109,
+  NumpadDecimal: 110,
+  NumpadDivide: 111,
+  NumLock: 144,
+  ScrollLock: 145,
+  Semicolon: 186,
+  Equal: 187,
+  Comma: 188,
+  Minus: 189,
+  Period: 190,
+  Slash: 191,
+  Backquote: 192,
+  BracketLeft: 219,
+  Backslash: 220,
+  BracketRight: 221,
+  Quote: 222,
+};
+
+function windowsVirtualKeyCode(event: KeyboardEvent): number {
+  const mapped = WINDOWS_VIRTUAL_KEY_BY_CODE[event.code];
+  if (mapped !== undefined) return mapped;
+  if (/^Key[A-Z]$/.test(event.code)) return event.code.charCodeAt(3);
+  if (/^Digit[0-9]$/.test(event.code)) return event.code.charCodeAt(5);
+  if (/^Numpad[0-9]$/.test(event.code)) return 96 + Number(event.code.at(-1));
+  if (/^F(?:[1-9]|1[0-9]|2[0-4])$/.test(event.code)) {
+    return 111 + Number(event.code.slice(1));
+  }
+  return event.keyCode;
+}
+
+function keyText(event: KeyboardEvent): string | undefined {
+  const hasAccelerator = event.altKey || event.ctrlKey || event.metaKey;
+  if (event.key === "Enter" && !hasAccelerator) return "\r";
+  const isAltGraph = event.getModifierState("AltGraph");
+  if (event.key.length === 1 && (!hasAccelerator || isAltGraph))
+    return event.key;
+  return undefined;
+}
+
+function sendKey(
+  event: KeyboardEvent,
+  type: "rawKeyDown" | "keyDown" | "keyUp",
+): void {
+  const virtualKeyCode = windowsVirtualKeyCode(event);
+  const text = type === "keyDown" ? keyText(event) : undefined;
+  void client.browser.input
+    .key({
+      type,
+      key: event.key,
+      code: event.code,
+      text,
+      unmodifiedText: text,
+      modifiers: inputModifiers(event),
+      autoRepeat: event.repeat,
+      windowsVirtualKeyCode: virtualKeyCode,
+      nativeVirtualKeyCode: virtualKeyCode,
+      location: event.location,
+      isKeypad: event.location === KeyboardEvent.DOM_KEY_LOCATION_NUMPAD,
+      isSystemKey: event.altKey,
+    })
+    .catch(reportError);
+}
+
+// The key chord performs the remote copy. This RPC additionally reads the remote
+// clipboard so the result can cross the process boundary into the viewer clipboard.
 async function copyFromPage(): Promise<void> {
   const { text } = await client.browser.clipboard.copy();
   if (!text) return;
@@ -385,28 +548,12 @@ canvas.addEventListener("keydown", (event) => {
     return;
   }
   event.preventDefault();
-  const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
-  if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
-    void client.browser.input.text.insert({ text: event.key }).catch(reportError);
-  } else {
-    void client.browser.input.key({
-      type: "keyDown",
-      key: event.key,
-      code: event.code,
-      modifiers,
-    }).catch(reportError);
-  }
+  sendKey(event, keyText(event) === undefined ? "rawKeyDown" : "keyDown");
 });
 canvas.addEventListener("keyup", (event) => {
   if (isPasteShortcut(event) || isCopyShortcut(event)) return;
-  if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) return;
-  const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
-  void client.browser.input.key({
-    type: "keyUp",
-    key: event.key,
-    code: event.code,
-    modifiers,
-  }).catch(reportError);
+  event.preventDefault();
+  sendKey(event, "keyUp");
 });
 
 clearLogsButton.addEventListener("click", () => {

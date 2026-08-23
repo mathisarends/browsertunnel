@@ -4,7 +4,7 @@ from typing import Literal
 import pyrpckit as rpc
 from pydantic import BaseModel, ConfigDict, Field
 
-from backend.application import BrowserTab, ClickEventType, CursorStyle, KeyEventType
+from backend.application import BrowserTab, CursorStyle, KeyEventType, MouseEventType
 
 
 class RpcModel(BaseModel):
@@ -28,21 +28,14 @@ class ReloadParams(RpcModel):
     ignore_cache: bool = Field(default=False, alias="ignoreCache")
 
 
-class ClickParams(RpcModel):
-    type: ClickEventType
+class MouseParams(RpcModel):
+    type: MouseEventType
     x: float
     y: float
-    button: Literal["left", "middle", "right", "back", "forward"]
+    button: Literal["none", "left", "middle", "right", "back", "forward"] = "none"
     buttons: int = Field(ge=0)
     modifiers: int = Field(default=0, ge=0)
-    click_count: int = Field(default=1, alias="clickCount", ge=0)
-
-
-class HoverParams(RpcModel):
-    x: float
-    y: float
-    buttons: int = Field(default=0, ge=0)
-    modifiers: int = Field(default=0, ge=0)
+    click_count: int = Field(default=0, alias="clickCount", ge=0)
 
 
 class ScrollParams(RpcModel):
@@ -57,8 +50,16 @@ class KeyParams(RpcModel):
     key: str
     code: str = ""
     text: str | None = None
+    unmodified_text: str | None = Field(default=None, alias="unmodifiedText")
     modifiers: int = Field(default=0, ge=0)
     auto_repeat: bool = Field(default=False, alias="autoRepeat")
+    windows_virtual_key_code: int = Field(
+        default=0, alias="windowsVirtualKeyCode", ge=0
+    )
+    native_virtual_key_code: int = Field(default=0, alias="nativeVirtualKeyCode", ge=0)
+    location: int = Field(default=0, ge=0, le=3)
+    is_keypad: bool = Field(default=False, alias="isKeypad")
+    is_system_key: bool = Field(default=False, alias="isSystemKey")
 
 
 class TextParams(RpcModel):

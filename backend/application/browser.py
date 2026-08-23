@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 
-class ClickEventType(StrEnum):
-    PRESSED = "mousePressed"
-    RELEASED = "mouseReleased"
+class MouseEventType(StrEnum):
+    DOWN = "mouseDown"
+    MOVE = "mouseMove"
+    UP = "mouseUp"
 
 
 class KeyEventType(StrEnum):
@@ -151,26 +152,16 @@ class Browser(ABC):
     async def stop_loading(self) -> None: ...
 
     @abstractmethod
-    async def click(
+    async def mouse(
         self,
         *,
-        event_type: ClickEventType,
+        event_type: MouseEventType,
         x: float,
         y: float,
         button: str,
         buttons: int,
         modifiers: int,
         click_count: int,
-    ) -> None: ...
-
-    @abstractmethod
-    async def hover(
-        self,
-        *,
-        x: float,
-        y: float,
-        buttons: int,
-        modifiers: int,
     ) -> None: ...
 
     @abstractmethod
@@ -186,8 +177,14 @@ class Browser(ABC):
         key: str,
         code: str,
         text: str | None,
+        unmodified_text: str | None,
         modifiers: int,
         auto_repeat: bool,
+        windows_virtual_key_code: int,
+        native_virtual_key_code: int,
+        location: int,
+        is_keypad: bool,
+        is_system_key: bool,
     ) -> None: ...
 
     @abstractmethod

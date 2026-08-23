@@ -6,8 +6,7 @@ export const RpcMethod = {
   BROWSER_NAV_FORWARD: "browser.nav.forward",
   BROWSER_NAV_RELOAD: "browser.nav.reload",
   BROWSER_NAV_STOP: "browser.nav.stop",
-  BROWSER_INPUT_CLICK: "browser.input.click",
-  BROWSER_INPUT_HOVER: "browser.input.hover",
+  BROWSER_INPUT_MOUSE: "browser.input.mouse",
   BROWSER_INPUT_SCROLL: "browser.input.scroll",
   BROWSER_INPUT_KEY: "browser.input.key",
   BROWSER_INPUT_TEXT_INSERT: "browser.input.text.insert",
@@ -62,23 +61,6 @@ export type BrowserTargetDetachedEvent = {
   tabId: string | null;
 };
 
-export const ClickEventType = {
-  MOUSEPRESSED: "mousePressed",
-  MOUSERELEASED: "mouseReleased",
-} as const;
-
-export type ClickEventType = (typeof ClickEventType)[keyof typeof ClickEventType];
-
-export type ClickParams = {
-  type: ClickEventType;
-  x: number;
-  y: number;
-  button: "left" | "middle" | "right" | "back" | "forward";
-  buttons: number;
-  modifiers?: number;
-  clickCount?: number;
-};
-
 export type ClipboardResult = {
   text: string;
 };
@@ -127,13 +109,6 @@ export const CursorStyle = {
 
 export type CursorStyle = (typeof CursorStyle)[keyof typeof CursorStyle];
 
-export type HoverParams = {
-  x: number;
-  y: number;
-  buttons?: number;
-  modifiers?: number;
-};
-
 export const KeyEventType = {
   KEYDOWN: "keyDown",
   KEYUP: "keyUp",
@@ -148,8 +123,32 @@ export type KeyParams = {
   key: string;
   code?: string;
   text?: string | null;
+  unmodifiedText?: string | null;
   modifiers?: number;
   autoRepeat?: boolean;
+  windowsVirtualKeyCode?: number;
+  nativeVirtualKeyCode?: number;
+  location?: number;
+  isKeypad?: boolean;
+  isSystemKey?: boolean;
+};
+
+export const MouseEventType = {
+  MOUSEDOWN: "mouseDown",
+  MOUSEMOVE: "mouseMove",
+  MOUSEUP: "mouseUp",
+} as const;
+
+export type MouseEventType = (typeof MouseEventType)[keyof typeof MouseEventType];
+
+export type MouseParams = {
+  type: MouseEventType;
+  x: number;
+  y: number;
+  button?: "none" | "left" | "middle" | "right" | "back" | "forward";
+  buttons: number;
+  modifiers?: number;
+  clickCount?: number;
 };
 
 export type NavigateParams = {

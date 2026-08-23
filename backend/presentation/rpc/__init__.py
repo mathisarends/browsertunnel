@@ -24,7 +24,7 @@ BROWSER_PROTOCOL = rpc.RpcProtocol(
             ),
         ),
     ),
-    version=1,
+    version=2,
 )
 
 __all__ = [

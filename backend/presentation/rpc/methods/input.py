@@ -4,17 +4,15 @@ import pyrpckit as rpc
 
 from backend.application import Browser
 from backend.presentation.rpc.models import (
-    ClickParams,
-    HoverParams,
     KeyParams,
+    MouseParams,
     ScrollParams,
     TextParams,
 )
 
 
 class InputMethod(StrEnum):
-    CLICK = "browser.input.click"
-    HOVER = "browser.input.hover"
+    MOUSE = "browser.input.mouse"
     SCROLL = "browser.input.scroll"
     KEY = "browser.input.key"
     INSERT_TEXT = "browser.input.text.insert"
@@ -25,9 +23,9 @@ class InputMethods(rpc.RpcHandler):
     def __init__(self, browser: Browser) -> None:
         self._browser = browser
 
-    @rpc.method(InputMethod.CLICK)
-    async def click(self, params: ClickParams) -> None:
-        await self._browser.click(
+    @rpc.method(InputMethod.MOUSE)
+    async def mouse(self, params: MouseParams) -> None:
+        await self._browser.mouse(
             event_type=params.type,
             x=params.x,
             y=params.y,
@@ -35,15 +33,6 @@ class InputMethods(rpc.RpcHandler):
             buttons=params.buttons,
             modifiers=params.modifiers,
             click_count=params.click_count,
-        )
-
-    @rpc.method(InputMethod.HOVER)
-    async def hover(self, params: HoverParams) -> None:
-        await self._browser.hover(
-            x=params.x,
-            y=params.y,
-            buttons=params.buttons,
-            modifiers=params.modifiers,
         )
 
     @rpc.method(InputMethod.SCROLL)
@@ -62,8 +51,14 @@ class InputMethods(rpc.RpcHandler):
             key=params.key,
             code=params.code,
             text=params.text,
+            unmodified_text=params.unmodified_text,
             modifiers=params.modifiers,
             auto_repeat=params.auto_repeat,
+            windows_virtual_key_code=params.windows_virtual_key_code,
+            native_virtual_key_code=params.native_virtual_key_code,
+            location=params.location,
+            is_keypad=params.is_keypad,
+            is_system_key=params.is_system_key,
         )
 
     @rpc.method(InputMethod.INSERT_TEXT)

@@ -3,11 +3,10 @@
 import { RpcMethod } from "./models";
 import type {
   BrowserEventNotification,
-  ClickParams,
   ClipboardResult,
   CreateTabParams,
-  HoverParams,
   KeyParams,
+  MouseParams,
   NavigateParams,
   ReloadParams,
   ScrollParams,
@@ -56,16 +55,9 @@ class BrowserNavClient {
 class BrowserInputClient {
   constructor(private readonly transport: RpcTransport) {}
 
-  async click(params: ClickParams): Promise<void> {
+  async mouse(params: MouseParams): Promise<void> {
     await this.transport.request<null>(
-      RpcMethod.BROWSER_INPUT_CLICK,
-      params,
-    );
-  }
-
-  async hover(params: HoverParams): Promise<void> {
-    await this.transport.request<null>(
-      RpcMethod.BROWSER_INPUT_HOVER,
+      RpcMethod.BROWSER_INPUT_MOUSE,
       params,
     );
   }

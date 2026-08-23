@@ -68,8 +68,8 @@ Browserereignisse sendet der Server als JSON-RPC-Notification `browser.event`.
 `params.type` unterscheidet Frames, Tab- und Navigationszustand sowie abgestürzte
 oder getrennte Targets. Frames sind im Application-Layer JPEG-Bytes und werden
 nur für den JSON-Transport als Base64 kodiert. Die dekorierten `pyrpckit`-Methoden
-decken URL-Navigation, Zurück, Vor, Neuladen, Ladestopp, getrennte Click- und
-Hover-Eingaben, Scrollen,
+decken URL-Navigation, Zurück, Vor, Neuladen, Ladestopp, generische Mouse-Down-,
+-Move- und -Up-Eingaben, Scrollen,
 Tastatur, Texteingabe, Clipboard sowie Tab-Liste, -Erstellung, -Aktivierung und
 -Schließen ab.
 
@@ -79,6 +79,6 @@ Der Browser lässt sich mit `BROWSER_EXECUTABLE`, `BROWSER_CDP_URL`,
 `BROWSER_CDP_URL` startet das Backend selbst Chrome, Chromium oder Edge.
 
 Ein realer Adapter-Smoke-Test steht über
-`uv run python -m scripts.smoke_backend` bereit. V1 hat noch keine
+`uv run python -m scripts.smoke_backend` bereit. Das Protokoll hat noch keine
 Authentifizierung; den Tunnel deshalb nur lokal oder hinter einem
 authentifizierenden Reverse Proxy bereitstellen.

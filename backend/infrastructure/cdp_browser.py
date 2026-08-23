@@ -11,8 +11,8 @@ from backend.application import (
     BrowserEvent,
     BrowserTab,
     BrowserTabNotFoundError,
-    ClickEventType,
     KeyEventType,
+    MouseEventType,
     ScreencastFrame,
     TabsChanged,
     TargetDetached,
@@ -27,8 +27,13 @@ from backend.settings import BrowserSettings
 logger = logging.getLogger(__name__)
 
 _CONTROL_MODIFIER = 2
-_VIRTUAL_KEY_C = 67
 _VIRTUAL_KEY_V = 86
+
+_CDP_MOUSE_EVENT = {
+    MouseEventType.DOWN: "mousePressed",
+    MouseEventType.MOVE: "mouseMoved",
+    MouseEventType.UP: "mouseReleased",
+}
 
 _SELECTION_SOURCE = """
 () => {
@@ -171,10 +176,10 @@ class CdpBrowser(Browser):
     async def stop_loading(self) -> None:
         await self._session().page.stop_loading()
 
-    async def click(
+    async def mouse(
         self,
         *,
-        event_type: ClickEventType,
+        event_type: MouseEventType,
         x: float,
         y: float,
         button: str,
@@ -183,31 +188,13 @@ class CdpBrowser(Browser):
         click_count: int,
     ) -> None:
         await self._session().input.dispatch_mouse_event(
-            type=event_type,
+            type=_CDP_MOUSE_EVENT[event_type],
             x=x,
             y=y,
             button=button,
             buttons=buttons,
             modifiers=modifiers,
             click_count=click_count,
-        )
-
-    async def hover(
-        self,
-        *,
-        x: float,
-        y: float,
-        buttons: int,
-        modifiers: int,
-    ) -> None:
-        await self._session().input.dispatch_mouse_event(
-            type="mouseMoved",
-            x=x,
-            y=y,
-            button="none",
-            buttons=buttons,
-            modifiers=modifiers,
-            click_count=0,
         )
 
     async def scroll(
@@ -228,16 +215,28 @@ class CdpBrowser(Browser):
         key: str,
         code: str,
         text: str | None,
+        unmodified_text: str | None,
         modifiers: int,
         auto_repeat: bool,
+        windows_virtual_key_code: int,
+        native_virtual_key_code: int,
+        location: int,
+        is_keypad: bool,
+        is_system_key: bool,
     ) -> None:
         await self._session().input.dispatch_key_event(
             type=event_type,
             key=key,
             code=code,
             text=text,
+            unmodified_text=unmodified_text,
             modifiers=modifiers,
             auto_repeat=auto_repeat,
+            windows_virtual_key_code=windows_virtual_key_code,
+            native_virtual_key_code=native_virtual_key_code,
+            location=location,
+            is_keypad=is_keypad,
+            is_system_key=is_system_key,
         )
 
     async def insert_text(self, text: str) -> None:
@@ -246,20 +245,19 @@ class CdpBrowser(Browser):
     async def copy(self) -> str:
         """Run the page's own copy command and hand the copied text back.
 
-        Dispatching Ctrl+C without the editing command only delivers key events;
-        Chrome needs the explicit command to copy. The page clipboard is the
-        authoritative source afterwards, but reading it can be denied, so the
-        raw selection serves as a fallback.
+        The shortcut is dispatched as an ordinary raw key event. The page clipboard
+        is authoritative afterwards, but reading it can be denied, so the raw
+        selection serves as a fallback.
         """
         session = self._session()
-        for event_type, commands in (("keyDown", ["copy"]), ("keyUp", None)):
+        for event_type in ("rawKeyDown", "keyUp"):
             await session.input.dispatch_key_event(
                 type=event_type,
                 key="c",
                 code="KeyC",
                 modifiers=_CONTROL_MODIFIER,
-                windows_virtual_key_code=_VIRTUAL_KEY_C,
-                commands=commands,
+                windows_virtual_key_code=67,
+                native_virtual_key_code=67,
             )
         try:
             copied = await self.read_clipboard()
@@ -301,7 +299,7 @@ class CdpBrowser(Browser):
     async def paste(self, text: str) -> None:
         """Put text on the page clipboard and let the page paste it natively.
 
-        Pasting through the editing command keeps the page's own paste handling
+        Pasting through the natural Ctrl+V chord keeps the page's own paste handling
         intact, which plain text insertion would bypass.
         """
         session = self._session()
@@ -311,14 +309,14 @@ class CdpBrowser(Browser):
             logger.debug("Clipboard is unavailable; inserting pasted text directly")
             await self.insert_text(text)
             return
-        for event_type, commands in (("keyDown", ["paste"]), ("keyUp", None)):
+        for event_type in ("rawKeyDown", "keyUp"):
             await session.input.dispatch_key_event(
                 type=event_type,
                 key="v",
                 code="KeyV",
                 modifiers=_CONTROL_MODIFIER,
                 windows_virtual_key_code=_VIRTUAL_KEY_V,
-                commands=commands,
+                native_virtual_key_code=_VIRTUAL_KEY_V,
             )
 
     async def list_tabs(self) -> list[BrowserTab]:

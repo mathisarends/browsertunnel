@@ -12,8 +12,8 @@ class FakeBrowser(Browser):
     def __init__(self) -> None:
         self.navigated_to: str | None = None
         self.navigation_commands: list[tuple[str, bool | None]] = []
-        self.click_events: list[dict] = []
-        self.hover_events: list[dict] = []
+        self.mouse_events: list[dict] = []
+        self.key_events: list[dict] = []
         self.pasted: list[str] = []
         self.copies = 0
         self.tabs = [BrowserTab("tab-1", "Example", "about:blank", True)]
@@ -47,17 +47,14 @@ class FakeBrowser(Browser):
     async def stop_loading(self) -> None:
         self.navigation_commands.append(("stop", None))
 
-    async def click(self, **kwargs) -> None:
-        self.click_events.append(kwargs)
-
-    async def hover(self, **kwargs) -> None:
-        self.hover_events.append(kwargs)
+    async def mouse(self, **kwargs) -> None:
+        self.mouse_events.append(kwargs)
 
     async def scroll(self, **kwargs) -> None:
         pass
 
     async def key(self, **kwargs) -> None:
-        pass
+        self.key_events.append(kwargs)
 
     async def insert_text(self, text: str) -> None:
         pass
@@ -188,61 +185,118 @@ async def test_json_rpc_dispatches_navigation_toolbar_commands() -> None:
 
 
 @pytest.mark.asyncio
-async def test_json_rpc_dispatches_separate_click_and_hover_commands() -> None:
+async def test_json_rpc_dispatches_generic_mouse_sequence() -> None:
     browser = FakeBrowser()
     server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
 
-    click_response = await server.handle(
-        {
-            "jsonrpc": "2.0",
-            "id": 5,
-            "method": "browser.input.click",
-            "params": {
-                "type": "mousePressed",
+    for request_id, params in enumerate(
+        (
+            {
+                "type": "mouseDown",
                 "x": 100,
                 "y": 200,
                 "button": "left",
                 "buttons": 1,
-                "modifiers": 0,
-                "clickCount": 2,
+                "clickCount": 1,
             },
-        }
-    )
-    hover_response = await server.handle(
-        {
-            "jsonrpc": "2.0",
-            "id": 6,
-            "method": "browser.input.hover",
-            "params": {
+            {
+                "type": "mouseMove",
                 "x": 123.5,
                 "y": 456.25,
-                "buttons": 0,
-                "modifiers": 8,
+                "button": "none",
+                "buttons": 1,
             },
-        }
-    )
+            {
+                "type": "mouseUp",
+                "x": 123.5,
+                "y": 456.25,
+                "button": "left",
+                "buttons": 0,
+                "clickCount": 1,
+            },
+        ),
+        start=5,
+    ):
+        response = await server.handle(
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": "browser.input.mouse",
+                "params": params,
+            }
+        )
+        assert response is not None
+        assert response.model_dump(mode="json")["result"] is None
 
-    assert click_response is not None
-    assert click_response.model_dump(mode="json")["result"] is None
-    assert hover_response is not None
-    assert hover_response.model_dump(mode="json")["result"] is None
-    assert browser.click_events == [
+    assert browser.mouse_events == [
         {
-            "event_type": "mousePressed",
+            "event_type": "mouseDown",
             "x": 100.0,
             "y": 200.0,
             "button": "left",
             "buttons": 1,
             "modifiers": 0,
-            "click_count": 2,
-        }
-    ]
-    assert browser.hover_events == [
+            "click_count": 1,
+        },
         {
+            "event_type": "mouseMove",
             "x": 123.5,
             "y": 456.25,
+            "button": "none",
+            "buttons": 1,
+            "modifiers": 0,
+            "click_count": 0,
+        },
+        {
+            "event_type": "mouseUp",
+            "x": 123.5,
+            "y": 456.25,
+            "button": "left",
             "buttons": 0,
-            "modifiers": 8,
+            "modifiers": 0,
+            "click_count": 1,
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_json_rpc_dispatches_complete_special_key_data() -> None:
+    browser = FakeBrowser()
+    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
+
+    response = await server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 12,
+            "method": "browser.input.key",
+            "params": {
+                "type": "rawKeyDown",
+                "key": "Delete",
+                "code": "Delete",
+                "windowsVirtualKeyCode": 46,
+                "nativeVirtualKeyCode": 46,
+                "location": 0,
+                "isKeypad": False,
+            },
+        }
+    )
+
+    assert response is not None
+    assert response.model_dump(mode="json")["result"] is None
+    assert browser.key_events == [
+        {
+            "event_type": "rawKeyDown",
+            "key": "Delete",
+            "code": "Delete",
+            "text": None,
+            "unmodified_text": None,
+            "modifiers": 0,
+            "auto_repeat": False,
+            "windows_virtual_key_code": 46,
+            "native_virtual_key_code": 46,
+            "location": 0,
+            "is_keypad": False,
+            "is_system_key": False,
         }
     ]
 
@@ -258,8 +312,7 @@ def test_protocol_contract_contains_methods_and_events() -> None:
         "browser.nav.forward",
         "browser.nav.reload",
         "browser.nav.stop",
-        "browser.input.click",
-        "browser.input.hover",
+        "browser.input.mouse",
         "browser.input.scroll",
         "browser.input.key",
         "browser.input.text.insert",
@@ -281,6 +334,8 @@ def test_protocol_contract_contains_methods_and_events() -> None:
         "browser.targetDetached",
     }
     assert openrpc["openrpc"] == "1.3.2"
+    assert schema["x-rpc-protocol-version"] == 2
+    assert openrpc["x-rpc-protocol-version"] == 2
 
     parameterless = {
         method["name"]: method
