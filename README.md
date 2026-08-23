@@ -8,24 +8,21 @@ WebSocket — no video codec involved.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Frontend["Frontend (TypeScript / Vite)"]
-        Canvas["<canvas> viewport"]
-    end
-
-    subgraph Backend["Backend (FastAPI)"]
-        Session["BrowserSession\n(one per WebSocket)"]
-        BrowserPort["Browser\nnavigation · input · clipboard · tabs"]
-        CDPBrowser["CdpBrowser"]
-    end
-
-    Chromium[("Chromium / Chrome")]
-
-    Canvas -- "requests: navigate, mouse, key, tabs..." --> Session
-    Session -- "frames + tab/nav/cursor state" --> Canvas
-    Session --> BrowserPort --> CDPBrowser
-    CDPBrowser -- "CDP" --> Chromium
+```
+┌──────────────────────┐   single WebSocket, JSON-RPC 2.0    ┌───────────────────────────┐
+│       Frontend        │ ──────────────────────────────────▶ │          Backend           │
+│  (TypeScript, Vite)   │  requests: navigate, mouse, key...  │  BrowserSession             │
+│                        │ ◀────────────────────────────────  │  Browser (nav · input ·    │
+│  <canvas> viewport     │  frames, tab/nav/cursor state       │  clipboard · tabs)         │
+└────────────────────────┘                                    └─────────────┬──────────────┘
+                                                                              │
+                                                                       Chrome DevTools
+                                                                          Protocol
+                                                                              │
+                                                                    ┌─────────▼─────────┐
+                                                                    │ Chromium / Chrome  │
+                                                                    │ (headless or not)  │
+                                                                    └────────────────────┘
 ```
 
 **Rendering.** The tab's screencast is pushed frame by frame as JSON-RPC
@@ -51,9 +48,11 @@ shouldn't touch the other two.
 other, both running as background tasks for as long as the connection is
 open.
 
-**No auth built in.** Anyone who can reach the WebSocket can drive the tab.
-Put it behind an authenticating reverse proxy, or keep it on `127.0.0.1` —
-that gate is on you, not on this project.
+**Why this exists.** This is a learning project, not a hardened product —
+there's no auth on the WebSocket, no rate limiting, none of the things a
+real deployment would need. Treat it as a reference for the core idea: how
+you'd mirror and control a browser tab remotely, stripped down to that one
+concept.
 
 The JSON-RPC plumbing and the CDP client are pulled in as libraries
 (`pyrpckit`, `cdpify`), not written here — the interesting part is how the
