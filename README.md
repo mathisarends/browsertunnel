@@ -55,7 +55,7 @@ Beispiel:
 {
   "jsonrpc": "2.0",
   "id": 1,
-  "method": "browser.navigate",
+  "method": "browser.nav.navigate",
   "params": {"url": "https://example.com"}
 }
 ```

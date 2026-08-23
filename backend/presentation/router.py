@@ -20,10 +20,10 @@ from backend.presentation.rpc import (
     BrowserCursorEvent,
     BrowserFrameEvent,
     BrowserNavigationEvent,
-    BrowserRpcMethods,
     BrowserTabsEvent,
     BrowserTargetCrashedEvent,
     BrowserTargetDetachedEvent,
+    browser_rpc_methods,
     tabs_result,
 )
 from backend.presentation.schemas import browser_json_schema, browser_openrpc_schema
@@ -50,7 +50,7 @@ async def browser_socket(
     await websocket.accept()
     send_lock = asyncio.Lock()
     server = rpc.RpcServer(
-        BrowserRpcMethods(browser),
+        *browser_rpc_methods(browser),
         protocol=BROWSER_PROTOCOL,
     )
 

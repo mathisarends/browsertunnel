@@ -127,11 +127,11 @@ export class BrowserClient {
   }
 
   async click(params: ClickParams): Promise<void> {
-    await this.call("browser.click", params);
+    await this.call("browser.input.click", params);
   }
 
   async hover(params: HoverParams): Promise<void> {
-    await this.call("browser.hover", params);
+    await this.call("browser.input.hover", params);
   }
 
   private handleMessage(message: MessageEvent): void {

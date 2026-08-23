@@ -1,6 +1,6 @@
 import pyrpckit as rpc
 
-from backend.presentation.rpc.methods import BrowserRpcMethods
+from backend.presentation.rpc.methods import BROWSER_RPC_METHODS, browser_rpc_methods
 from backend.presentation.rpc.models import (
     BrowserCursorEvent,
     BrowserEvent,
@@ -15,7 +15,7 @@ from backend.presentation.rpc.models import (
 BROWSER_PROTOCOL = rpc.RpcProtocol(
     rpc.feature(
         "browser",
-        handlers=(BrowserRpcMethods,),
+        handlers=BROWSER_RPC_METHODS,
         notifications=(
             rpc.notification(
                 "browser.event",
@@ -32,7 +32,7 @@ __all__ = [
     "BrowserCursorEvent",
     "BrowserFrameEvent",
     "BrowserNavigationEvent",
-    "BrowserRpcMethods",
+    "browser_rpc_methods",
     "BrowserTabsEvent",
     "BrowserTargetCrashedEvent",
     "BrowserTargetDetachedEvent",

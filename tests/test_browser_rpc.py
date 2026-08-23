@@ -5,7 +5,7 @@ from pyrpckit import RpcServer
 from pyrpckit.schema import render_json_schema, render_openrpc
 
 from backend.application import Browser, BrowserEvent, BrowserTab, ScreencastFrame
-from backend.presentation.rpc import BROWSER_PROTOCOL, BrowserRpcMethods
+from backend.presentation.rpc import BROWSER_PROTOCOL, browser_rpc_methods
 
 
 class FakeBrowser(Browser):
@@ -86,13 +86,13 @@ class FakeBrowser(Browser):
 @pytest.mark.asyncio
 async def test_json_rpc_dispatches_browser_commands() -> None:
     browser = FakeBrowser()
-    server = RpcServer(BrowserRpcMethods(browser), protocol=BROWSER_PROTOCOL)
+    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
 
     response = await server.handle(
         {
             "jsonrpc": "2.0",
             "id": 7,
-            "method": "browser.navigate",
+            "method": "browser.nav.navigate",
             "params": {"url": "https://example.com"},
         }
     )
@@ -109,13 +109,13 @@ async def test_json_rpc_dispatches_browser_commands() -> None:
 @pytest.mark.asyncio
 async def test_json_rpc_pastes_viewer_clipboard_text() -> None:
     browser = FakeBrowser()
-    server = RpcServer(BrowserRpcMethods(browser), protocol=BROWSER_PROTOCOL)
+    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
 
     response = await server.handle(
         {
             "jsonrpc": "2.0",
             "id": 9,
-            "method": "browser.clipboard.paste",
+            "method": "browser.input.paste",
             "params": {"text": "from the local machine"},
         }
     )
@@ -127,13 +127,13 @@ async def test_json_rpc_pastes_viewer_clipboard_text() -> None:
 
 @pytest.mark.asyncio
 async def test_json_rpc_rejects_invalid_params() -> None:
-    server = RpcServer(BrowserRpcMethods(FakeBrowser()), protocol=BROWSER_PROTOCOL)
+    server = RpcServer(*browser_rpc_methods(FakeBrowser()), protocol=BROWSER_PROTOCOL)
 
     response = await server.handle(
         {
             "jsonrpc": "2.0",
             "id": "bad",
-            "method": "browser.scroll",
+            "method": "browser.input.scroll",
             "params": {"x": 1, "y": 2, "deltaX": 3},
         }
     )
@@ -145,13 +145,13 @@ async def test_json_rpc_rejects_invalid_params() -> None:
 @pytest.mark.asyncio
 async def test_json_rpc_dispatches_navigation_toolbar_commands() -> None:
     browser = FakeBrowser()
-    server = RpcServer(BrowserRpcMethods(browser), protocol=BROWSER_PROTOCOL)
+    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
 
     for request_id, method, params in (
-        (1, "browser.goBack", {}),
-        (2, "browser.goForward", {}),
-        (3, "browser.reload", {"ignoreCache": True}),
-        (4, "browser.stopLoading", {}),
+        (1, "browser.nav.back", {}),
+        (2, "browser.nav.forward", {}),
+        (3, "browser.nav.reload", {"ignoreCache": True}),
+        (4, "browser.nav.stop", {}),
     ):
         response = await server.handle(
             {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}
@@ -170,13 +170,13 @@ async def test_json_rpc_dispatches_navigation_toolbar_commands() -> None:
 @pytest.mark.asyncio
 async def test_json_rpc_dispatches_separate_click_and_hover_commands() -> None:
     browser = FakeBrowser()
-    server = RpcServer(BrowserRpcMethods(browser), protocol=BROWSER_PROTOCOL)
+    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
 
     click_response = await server.handle(
         {
             "jsonrpc": "2.0",
             "id": 5,
-            "method": "browser.click",
+            "method": "browser.input.click",
             "params": {
                 "type": "mousePressed",
                 "x": 100,
@@ -192,7 +192,7 @@ async def test_json_rpc_dispatches_separate_click_and_hover_commands() -> None:
         {
             "jsonrpc": "2.0",
             "id": 6,
-            "method": "browser.hover",
+            "method": "browser.input.hover",
             "params": {
                 "x": 123.5,
                 "y": 456.25,
@@ -232,18 +232,25 @@ def test_protocol_contract_contains_methods_and_events() -> None:
     openrpc = render_openrpc(BROWSER_PROTOCOL, title="BrowserTunnel")
     methods = {method["name"] for method in schema["x-rpc-methods"]}
 
-    assert methods >= {
-        "browser.navigate",
-        "browser.goBack",
-        "browser.goForward",
-        "browser.reload",
-        "browser.stopLoading",
-        "browser.click",
-        "browser.hover",
-        "browser.tab.create",
+    assert methods == {
+        "browser.nav.navigate",
+        "browser.nav.back",
+        "browser.nav.forward",
+        "browser.nav.reload",
+        "browser.nav.stop",
+        "browser.input.click",
+        "browser.input.hover",
+        "browser.input.scroll",
+        "browser.input.key",
+        "browser.input.text.insert",
+        "browser.input.paste",
+        "browser.clipboard.read",
         "browser.clipboard.write",
+        "browser.tab.list",
+        "browser.tab.create",
+        "browser.tab.activate",
+        "browser.tab.close",
     }
-    assert "browser.mouse" not in methods
     assert {event["name"] for event in schema["x-rpc-events"]} == {
         "browser.cursor",
         "browser.frame",

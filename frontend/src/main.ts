@@ -206,7 +206,7 @@ function mouseModifiers(event: MouseEvent): number {
 }
 
 function sendClick(params: ClickParams): void {
-  log("outgoing", "browser.click", params);
+  log("outgoing", "browser.input.click", params);
   void client.click(params).catch(reportError);
 }
 
@@ -221,7 +221,7 @@ function documentHover(params: HoverParams): void {
     hoverLogTimer = undefined;
     if (!hoverLogStart || !hoverLogEnd) return;
 
-    log("outgoing", "browser.hover", {
+    log("outgoing", "browser.input.hover", {
       from: hoverLogStart,
       to: hoverLogEnd,
     });
@@ -256,7 +256,7 @@ function queueHover(): void {
 addressForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const value = addressInput.value.trim();
-  if (value) void rpc("browser.navigate", { url: normalizeUrl(value) }).catch(reportError);
+  if (value) void rpc("browser.nav.navigate", { url: normalizeUrl(value) }).catch(reportError);
 });
 
 newTabButton.addEventListener("click", () => {
@@ -304,7 +304,7 @@ canvas.addEventListener(
   "wheel",
   (event) => {
     event.preventDefault();
-    void rpc("browser.scroll", { ...canvasPoint(event), deltaX: event.deltaX, deltaY: event.deltaY }).catch(reportError);
+    void rpc("browser.input.scroll", { ...canvasPoint(event), deltaX: event.deltaX, deltaY: event.deltaY }).catch(reportError);
   },
   { passive: false },
 );
@@ -318,8 +318,8 @@ document.addEventListener("paste", (event) => {
   const text = event.clipboardData?.getData("text/plain");
   if (!text) return;
 
-  log("outgoing", "browser.clipboard.paste", { length: text.length });
-  void client.call("browser.clipboard.paste", { text }).catch(reportError);
+  log("outgoing", "browser.input.paste", { length: text.length });
+  void client.call("browser.input.paste", { text }).catch(reportError);
 });
 
 canvas.addEventListener("keydown", (event) => {
@@ -328,16 +328,16 @@ canvas.addEventListener("keydown", (event) => {
   event.preventDefault();
   const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
   if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
-    void rpc("browser.text.insert", { text: event.key }).catch(reportError);
+    void rpc("browser.input.text.insert", { text: event.key }).catch(reportError);
   } else {
-    void rpc("browser.key", { type: "keyDown", key: event.key, code: event.code, modifiers }).catch(reportError);
+    void rpc("browser.input.key", { type: "keyDown", key: event.key, code: event.code, modifiers }).catch(reportError);
   }
 });
 canvas.addEventListener("keyup", (event) => {
   if (isPasteShortcut(event)) return;
   if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) return;
   const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
-  void rpc("browser.key", { type: "keyUp", key: event.key, code: event.code, modifiers }).catch(reportError);
+  void rpc("browser.input.key", { type: "keyUp", key: event.key, code: event.code, modifiers }).catch(reportError);
 });
 
 clearLogsButton.addEventListener("click", () => {
