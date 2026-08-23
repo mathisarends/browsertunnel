@@ -8,11 +8,13 @@ WebSocket.
 Learning project, not a hardened product: no auth, no rate limiting. It's a
 reference for the core idea, not something to deploy as is.
 
+### See it in action
+
 <video src="https://github.com/user-attachments/assets/b5fd9da7-6170-4d91-a70f-c37da632d414" controls></video>
 
-Sped up 1.5x.
+*Sped up 1.5x.*
 
-The tricky parts: full clipboard support (copy/read/write round-tripped
+As seen in the video: full clipboard support (copy/read/write round-tripped
 through CDP), full tab support (list/create/activate/close, all in sync with
 the mirrored session), and cursor shape. The cursor CDP reports has to be
 translated into a CSS cursor and played back in the frontend itself, it's
