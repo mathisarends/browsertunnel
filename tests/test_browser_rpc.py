@@ -4,48 +4,36 @@ import pytest
 from pyrpckit import RpcServer
 from pyrpckit.schema import render_json_schema, render_openrpc
 
-from backend.application import Browser, BrowserEvent, BrowserTab, ScreencastFrame
+from backend.application import BrowserEvent, BrowserTab, ScreencastFrame
 from backend.presentation.rpc import BROWSER_PROTOCOL, browser_rpc_methods
 
 
-class FakeBrowser(Browser):
+class FakeNavigation:
     def __init__(self) -> None:
         self.navigated_to: str | None = None
-        self.navigation_commands: list[tuple[str, bool | None]] = []
-        self.mouse_events: list[dict] = []
-        self.key_events: list[dict] = []
-        self.pasted: list[str] = []
-        self.copies = 0
-        self.tabs = [BrowserTab("tab-1", "Example", "about:blank", True)]
-
-    async def start(self) -> None:
-        pass
-
-    async def stop(self) -> None:
-        pass
-
-    async def events(self) -> AsyncIterator[BrowserEvent]:
-        if False:
-            yield
-
-    async def screencast_frames(self) -> AsyncIterator[ScreencastFrame]:
-        if False:
-            yield
+        self.commands: list[tuple[str, bool | None]] = []
 
     async def navigate(self, url: str) -> None:
         self.navigated_to = url
 
-    async def go_back(self) -> None:
-        self.navigation_commands.append(("back", None))
+    async def back(self) -> None:
+        self.commands.append(("back", None))
 
-    async def go_forward(self) -> None:
-        self.navigation_commands.append(("forward", None))
+    async def forward(self) -> None:
+        self.commands.append(("forward", None))
 
     async def reload(self, *, ignore_cache: bool = False) -> None:
-        self.navigation_commands.append(("reload", ignore_cache))
+        self.commands.append(("reload", ignore_cache))
 
-    async def stop_loading(self) -> None:
-        self.navigation_commands.append(("stop", None))
+    async def stop(self) -> None:
+        self.commands.append(("stop", None))
+
+
+class FakeInput:
+    def __init__(self) -> None:
+        self.mouse_events: list[dict] = []
+        self.key_events: list[dict] = []
+        self.pasted: list[str] = []
 
     async def mouse(self, **kwargs) -> None:
         self.mouse_events.append(kwargs)
@@ -62,27 +50,59 @@ class FakeBrowser(Browser):
     async def paste(self, text: str) -> None:
         self.pasted.append(text)
 
+
+class FakeClipboard:
+    def __init__(self) -> None:
+        self.copies = 0
+
     async def copy(self) -> str:
         self.copies += 1
         return "copied selection"
 
-    async def read_clipboard(self) -> str:
+    async def read(self) -> str:
         return "clipboard"
 
-    async def write_clipboard(self, text: str) -> None:
+    async def write(self, text: str) -> None:
         pass
 
-    async def list_tabs(self) -> list[BrowserTab]:
+
+class FakeTabs:
+    def __init__(self) -> None:
+        self.tabs = [BrowserTab("tab-1", "Example", "about:blank", True)]
+
+    async def list(self) -> list[BrowserTab]:
         return self.tabs
 
-    async def create_tab(self, url: str) -> list[BrowserTab]:
+    async def create(self, url: str) -> list[BrowserTab]:
         return self.tabs
 
-    async def activate_tab(self, tab_id: str) -> list[BrowserTab]:
+    async def activate(self, tab_id: str) -> list[BrowserTab]:
         return self.tabs
 
-    async def close_tab(self, tab_id: str) -> list[BrowserTab]:
+    async def close(self, tab_id: str) -> list[BrowserTab]:
         return self.tabs
+
+
+class FakeBrowser:
+    def __init__(self) -> None:
+        self.navigation = FakeNavigation()
+        self.input = FakeInput()
+        self.clipboard = FakeClipboard()
+        self.tabs = FakeTabs()
+
+    async def start(self) -> None:
+        pass
+
+    async def stop(self) -> None:
+        pass
+
+    async def events(self) -> AsyncIterator[BrowserEvent]:
+        if False:
+            yield
+
+    async def screencast_frames(self) -> AsyncIterator[ScreencastFrame]:
+        if False:
+            yield
 
 
 @pytest.mark.asyncio
@@ -105,7 +125,7 @@ async def test_json_rpc_dispatches_browser_commands() -> None:
         "id": 7,
         "result": None,
     }
-    assert browser.navigated_to == "https://example.com"
+    assert browser.navigation.navigated_to == "https://example.com"
 
 
 @pytest.mark.asyncio
@@ -124,7 +144,7 @@ async def test_json_rpc_pastes_viewer_clipboard_text() -> None:
 
     assert response is not None
     assert response.model_dump(mode="json")["result"] is None
-    assert browser.pasted == ["from the local machine"]
+    assert browser.input.pasted == ["from the local machine"]
 
 
 @pytest.mark.asyncio
@@ -138,7 +158,7 @@ async def test_json_rpc_returns_the_pages_copied_selection() -> None:
 
     assert response is not None
     assert response.model_dump(mode="json")["result"] == {"text": "copied selection"}
-    assert browser.copies == 1
+    assert browser.clipboard.copies == 1
 
 
 @pytest.mark.asyncio
@@ -176,7 +196,7 @@ async def test_json_rpc_dispatches_navigation_toolbar_commands() -> None:
         assert response is not None
         assert response.model_dump(mode="json")["result"] is None
 
-    assert browser.navigation_commands == [
+    assert browser.navigation.commands == [
         ("back", None),
         ("forward", None),
         ("reload", True),
@@ -228,7 +248,7 @@ async def test_json_rpc_dispatches_generic_mouse_sequence() -> None:
         assert response is not None
         assert response.model_dump(mode="json")["result"] is None
 
-    assert browser.mouse_events == [
+    assert browser.input.mouse_events == [
         {
             "event_type": "mouseDown",
             "x": 100.0,
@@ -283,7 +303,7 @@ async def test_json_rpc_dispatches_complete_special_key_data() -> None:
 
     assert response is not None
     assert response.model_dump(mode="json")["result"] is None
-    assert browser.key_events == [
+    assert browser.input.key_events == [
         {
             "event_type": "rawKeyDown",
             "key": "Delete",

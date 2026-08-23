@@ -1,7 +1,7 @@
-from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Protocol
 
 
 class MouseEventType(StrEnum):
@@ -121,37 +121,23 @@ class BrowserTabNotFoundError(LookupError):
     pass
 
 
-class Browser(ABC):
-    """Application-owned port for a controllable, screencast-capable browser."""
+class BrowserNavigation(Protocol):
+    """Move the mirrored tab through the web."""
 
-    @abstractmethod
-    async def start(self) -> None: ...
-
-    @abstractmethod
-    async def stop(self) -> None: ...
-
-    @abstractmethod
-    async def events(self) -> AsyncIterator[BrowserEvent]: ...
-
-    @abstractmethod
-    async def screencast_frames(self) -> AsyncIterator[ScreencastFrame]: ...
-
-    @abstractmethod
     async def navigate(self, url: str) -> None: ...
 
-    @abstractmethod
-    async def go_back(self) -> None: ...
+    async def back(self) -> None: ...
 
-    @abstractmethod
-    async def go_forward(self) -> None: ...
+    async def forward(self) -> None: ...
 
-    @abstractmethod
     async def reload(self, *, ignore_cache: bool = False) -> None: ...
 
-    @abstractmethod
-    async def stop_loading(self) -> None: ...
+    async def stop(self) -> None: ...
 
-    @abstractmethod
+
+class BrowserInput(Protocol):
+    """Replay viewer input on the mirrored tab."""
+
     async def mouse(
         self,
         *,
@@ -164,12 +150,10 @@ class Browser(ABC):
         click_count: int,
     ) -> None: ...
 
-    @abstractmethod
     async def scroll(
         self, *, x: float, y: float, delta_x: float, delta_y: float
     ) -> None: ...
 
-    @abstractmethod
     async def key(
         self,
         *,
@@ -187,29 +171,60 @@ class Browser(ABC):
         is_system_key: bool,
     ) -> None: ...
 
-    @abstractmethod
     async def insert_text(self, text: str) -> None: ...
 
-    @abstractmethod
     async def paste(self, text: str) -> None: ...
 
-    @abstractmethod
+
+class BrowserClipboard(Protocol):
+    """Exchange text between the viewer and the mirrored tab."""
+
     async def copy(self) -> str: ...
 
-    @abstractmethod
-    async def read_clipboard(self) -> str: ...
+    async def read(self) -> str: ...
 
-    @abstractmethod
-    async def write_clipboard(self, text: str) -> None: ...
+    async def write(self, text: str) -> None: ...
 
-    @abstractmethod
-    async def list_tabs(self) -> list[BrowserTab]: ...
 
-    @abstractmethod
-    async def create_tab(self, url: str) -> list[BrowserTab]: ...
+class BrowserTabs(Protocol):
+    """Inspect and switch the tabs the tunnel can mirror.
 
-    @abstractmethod
-    async def activate_tab(self, tab_id: str) -> list[BrowserTab]: ...
+    Every command answers with the full tab list, so a viewer never has to
+    re-query to learn which tab the tunnel ended up on.
+    """
 
-    @abstractmethod
-    async def close_tab(self, tab_id: str) -> list[BrowserTab]: ...
+    async def list(self) -> list[BrowserTab]: ...
+
+    async def create(self, url: str) -> list[BrowserTab]: ...
+
+    async def activate(self, tab_id: str) -> list[BrowserTab]: ...
+
+    async def close(self, tab_id: str) -> list[BrowserTab]: ...
+
+
+class Browser(Protocol):
+    """Application-owned port for a controllable, screencast-capable browser.
+
+    Commands are grouped by what they act on, so a caller depends on the one
+    namespace it drives instead of on every command the tunnel offers.
+    """
+
+    @property
+    def navigation(self) -> BrowserNavigation: ...
+
+    @property
+    def input(self) -> BrowserInput: ...
+
+    @property
+    def clipboard(self) -> BrowserClipboard: ...
+
+    @property
+    def tabs(self) -> BrowserTabs: ...
+
+    async def start(self) -> None: ...
+
+    async def stop(self) -> None: ...
+
+    def events(self) -> AsyncIterator[BrowserEvent]: ...
+
+    def screencast_frames(self) -> AsyncIterator[ScreencastFrame]: ...

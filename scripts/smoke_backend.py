@@ -19,7 +19,7 @@ async def main() -> None:
     browser = CdpBrowser(BrowserSettings(_env_file=None))
     await browser.start()
     try:
-        tabs = await browser.list_tabs()
+        tabs = await browser.tabs.list()
         print(f"CDP connected with {len(tabs)} tab(s)")
         async with (
             aclosing(browser.events()) as events,
@@ -28,7 +28,9 @@ async def main() -> None:
             navigation_task = asyncio.create_task(next_navigation(events))
             frame_task = asyncio.create_task(anext(frames))
             await asyncio.sleep(0)
-            await browser.navigate("data:text/html,<title>BrowserTunnel</title>")
+            await browser.navigation.navigate(
+                "data:text/html,<title>BrowserTunnel</title>"
+            )
             navigation, frame = await asyncio.wait_for(
                 asyncio.gather(navigation_task, frame_task), timeout=5
             )

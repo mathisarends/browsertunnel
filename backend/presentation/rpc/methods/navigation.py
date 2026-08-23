@@ -2,7 +2,7 @@ from enum import StrEnum
 
 import pyrpckit as rpc
 
-from backend.application import Browser
+from backend.application import BrowserNavigation
 from backend.presentation.rpc.models import (
     NavigateParams,
     ReloadParams,
@@ -18,25 +18,25 @@ class NavigationMethod(StrEnum):
 
 
 class NavigationMethods(rpc.RpcHandler):
-    def __init__(self, browser: Browser) -> None:
-        self._browser = browser
+    def __init__(self, navigation: BrowserNavigation) -> None:
+        self._navigation = navigation
 
     @rpc.method(NavigationMethod.NAVIGATE)
     async def navigate(self, params: NavigateParams) -> None:
-        await self._browser.navigate(params.url)
+        await self._navigation.navigate(params.url)
 
     @rpc.method(NavigationMethod.BACK)
     async def back(self) -> None:
-        await self._browser.go_back()
+        await self._navigation.back()
 
     @rpc.method(NavigationMethod.FORWARD)
     async def forward(self) -> None:
-        await self._browser.go_forward()
+        await self._navigation.forward()
 
     @rpc.method(NavigationMethod.RELOAD)
     async def reload(self, params: ReloadParams) -> None:
-        await self._browser.reload(ignore_cache=params.ignore_cache)
+        await self._navigation.reload(ignore_cache=params.ignore_cache)
 
     @rpc.method(NavigationMethod.STOP)
     async def stop(self) -> None:
-        await self._browser.stop_loading()
+        await self._navigation.stop()

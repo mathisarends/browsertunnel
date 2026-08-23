@@ -3,7 +3,8 @@ from types import SimpleNamespace
 import pytest
 
 from backend.application import KeyEventType, MouseEventType
-from backend.infrastructure.cdp_browser import CdpBrowser
+from backend.infrastructure.cdp_browser import CdpClipboard, CdpInput
+from backend.infrastructure.cdp_browser.active_target import ActiveTarget
 
 
 class RecordingInput:
@@ -26,26 +27,25 @@ class ClipboardRuntime:
         )
 
 
-def browser_with_recording_session() -> tuple[CdpBrowser, RecordingInput]:
-    browser = object.__new__(CdpBrowser)
+def recording_target() -> tuple[ActiveTarget, RecordingInput]:
     input_domain = RecordingInput()
-    browser._active_session = SimpleNamespace(  # noqa: SLF001
-        input=input_domain,
-        runtime=ClipboardRuntime(),
-    )
-    return browser, input_domain
+    target = ActiveTarget()
+    session = SimpleNamespace(input=input_domain, runtime=ClipboardRuntime())
+    target.mirror(session, "tab-1")
+    return target, input_domain
 
 
 @pytest.mark.asyncio
 async def test_mouse_primitives_preserve_the_held_button_during_a_drag() -> None:
-    browser, input_domain = browser_with_recording_session()
+    target, input_domain = recording_target()
+    browser_input = CdpInput(target, CdpClipboard(target))
 
     for event_type, x, y, button, buttons in (
         (MouseEventType.DOWN, 10, 20, "left", 1),
         (MouseEventType.MOVE, 10, 80, "left", 1),
         (MouseEventType.UP, 10, 80, "left", 0),
     ):
-        await browser.mouse(
+        await browser_input.mouse(
             event_type=event_type,
             x=x,
             y=y,
@@ -73,9 +73,10 @@ async def test_mouse_primitives_preserve_the_held_button_during_a_drag() -> None
 
 @pytest.mark.asyncio
 async def test_special_key_metadata_is_forwarded_unchanged_to_cdp() -> None:
-    browser, input_domain = browser_with_recording_session()
+    target, input_domain = recording_target()
+    browser_input = CdpInput(target, CdpClipboard(target))
 
-    await browser.key(
+    await browser_input.key(
         event_type=KeyEventType.RAW_DOWN,
         key="Backspace",
         code="Backspace",
@@ -110,9 +111,9 @@ async def test_special_key_metadata_is_forwarded_unchanged_to_cdp() -> None:
 
 @pytest.mark.asyncio
 async def test_copy_uses_natural_ctrl_c_without_editing_commands() -> None:
-    browser, input_domain = browser_with_recording_session()
+    target, input_domain = recording_target()
 
-    assert await browser.copy() == "selected text"
+    assert await CdpClipboard(target).copy() == "selected text"
 
     assert [event["type"] for event in input_domain.key_events] == [
         "rawKeyDown",

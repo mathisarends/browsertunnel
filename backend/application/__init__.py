@@ -1,8 +1,12 @@
 from backend.application.browser import (
     Browser,
+    BrowserClipboard,
     BrowserEvent,
+    BrowserInput,
+    BrowserNavigation,
     BrowserTab,
     BrowserTabNotFoundError,
+    BrowserTabs,
     CursorChanged,
     CursorStyle,
     KeyEventType,
@@ -15,10 +19,14 @@ from backend.application.browser import (
 )
 
 __all__ = [
+    "Browser",
+    "BrowserClipboard",
     "BrowserEvent",
+    "BrowserInput",
+    "BrowserNavigation",
     "BrowserTab",
     "BrowserTabNotFoundError",
-    "Browser",
+    "BrowserTabs",
     "CursorChanged",
     "CursorStyle",
     "KeyEventType",

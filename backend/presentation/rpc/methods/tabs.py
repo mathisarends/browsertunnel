@@ -2,7 +2,7 @@ from enum import StrEnum
 
 import pyrpckit as rpc
 
-from backend.application import Browser, BrowserTabNotFoundError
+from backend.application import BrowserTabNotFoundError, BrowserTabs
 from backend.presentation.rpc.models import (
     CreateTabParams,
     TabParams,
@@ -24,21 +24,21 @@ class BrowserTabNotFound(rpc.RpcError):
 
 
 class TabMethods(rpc.RpcHandler):
-    def __init__(self, browser: Browser) -> None:
-        self._browser = browser
+    def __init__(self, tabs: BrowserTabs) -> None:
+        self._tabs = tabs
 
     @rpc.method(TabMethod.LIST)
     async def list(self) -> TabsResult:
-        return tabs_result(await self._browser.list_tabs())
+        return tabs_result(await self._tabs.list())
 
     @rpc.method(TabMethod.CREATE)
     async def create(self, params: CreateTabParams) -> TabsResult:
-        return tabs_result(await self._browser.create_tab(params.url))
+        return tabs_result(await self._tabs.create(params.url))
 
     @rpc.method(TabMethod.ACTIVATE, errors=(BrowserTabNotFound,))
     async def activate(self, params: TabParams) -> TabsResult:
         try:
-            tabs = await self._browser.activate_tab(params.tab_id)
+            tabs = await self._tabs.activate(params.tab_id)
         except BrowserTabNotFoundError as error:
             raise BrowserTabNotFound(
                 f"Browser tab not found: {params.tab_id}"
@@ -48,7 +48,7 @@ class TabMethods(rpc.RpcHandler):
     @rpc.method(TabMethod.CLOSE, errors=(BrowserTabNotFound,))
     async def close(self, params: TabParams) -> TabsResult:
         try:
-            tabs = await self._browser.close_tab(params.tab_id)
+            tabs = await self._tabs.close(params.tab_id)
         except BrowserTabNotFoundError as error:
             raise BrowserTabNotFound(
                 f"Browser tab not found: {params.tab_id}"
