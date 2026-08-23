@@ -9,6 +9,10 @@ import {
 } from "./api";
 
 type EventPayload = Record<string, unknown>;
+type HoverPoint = Pick<HoverParams, "x" | "y">;
+
+const HOVER_LOG_IDLE_MS = 250;
+const MAX_LOG_ENTRIES = 200;
 
 function element<T extends Element>(selector: string): T {
   const found = document.querySelector<T>(selector);
@@ -32,6 +36,10 @@ let renderingFrame = false;
 let latestHover: HoverParams | undefined;
 let hoverFrame: number | undefined;
 let hoverInFlight = false;
+let hoverLogTimer: ReturnType<typeof setTimeout> | undefined;
+let hoverLogStart: HoverPoint | undefined;
+let hoverLogEnd: HoverPoint | undefined;
+let lastHoverPoint: HoverPoint | undefined;
 
 function log(direction: "incoming" | "outgoing", name: string, payload: EventPayload = {}): void {
   const entry = document.createElement("li");
@@ -49,6 +57,9 @@ function log(direction: "incoming" | "outgoing", name: string, payload: EventPay
   meta.append(directionLabel, eventName, timestamp);
   entry.append(meta, data);
   eventLog.append(entry);
+  while (eventLog.childElementCount > MAX_LOG_ENTRIES) {
+    eventLog.firstElementChild?.remove();
+  }
   emptyLog.hidden = true;
   eventLog.scrollTop = eventLog.scrollHeight;
 }
@@ -196,8 +207,33 @@ function sendClick(params: ClickParams): void {
   void client.click(params).catch(reportError);
 }
 
+function documentHover(params: HoverParams): void {
+  const point = { x: params.x, y: params.y };
+  hoverLogStart ??= lastHoverPoint ?? point;
+  hoverLogEnd = point;
+  lastHoverPoint = point;
+
+  if (hoverLogTimer !== undefined) clearTimeout(hoverLogTimer);
+  hoverLogTimer = setTimeout(() => {
+    hoverLogTimer = undefined;
+    if (!hoverLogStart || !hoverLogEnd) return;
+
+    log("outgoing", "browser.hover", {
+      from: hoverLogStart,
+      to: hoverLogEnd,
+    });
+    hoverLogStart = undefined;
+    hoverLogEnd = undefined;
+  }, HOVER_LOG_IDLE_MS);
+}
+
 function scheduleHover(params: HoverParams): void {
+  documentHover(params);
   latestHover = params;
+  queueHover();
+}
+
+function queueHover(): void {
   if (hoverFrame !== undefined || hoverInFlight) return;
 
   hoverFrame = requestAnimationFrame(() => {
@@ -207,10 +243,9 @@ function scheduleHover(params: HoverParams): void {
     if (!next) return;
 
     hoverInFlight = true;
-    log("outgoing", "browser.hover", next);
     void client.hover(next).catch(reportError).finally(() => {
       hoverInFlight = false;
-      if (latestHover) scheduleHover(latestHover);
+      if (latestHover) queueHover();
     });
   });
 }
