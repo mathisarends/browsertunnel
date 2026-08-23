@@ -12,6 +12,7 @@ class FakeBrowser(BrowserTunnel):
     def __init__(self) -> None:
         self.navigated_to: str | None = None
         self.navigation_commands: list[tuple[str, bool | None]] = []
+        self.mouse_events: list[dict] = []
         self.tabs = [BrowserTab("tab-1", "Example", "about:blank", True)]
 
     async def events(self) -> AsyncIterator[BrowserEvent]:
@@ -34,7 +35,7 @@ class FakeBrowser(BrowserTunnel):
         self.navigation_commands.append(("stop", None))
 
     async def mouse(self, **kwargs) -> None:
-        pass
+        self.mouse_events.append(kwargs)
 
     async def scroll(self, **kwargs) -> None:
         pass
@@ -126,6 +127,43 @@ async def test_json_rpc_dispatches_navigation_toolbar_commands() -> None:
         ("forward", None),
         ("reload", True),
         ("stop", None),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_json_rpc_dispatches_mouse_move_for_hover_states() -> None:
+    browser = FakeBrowser()
+    server = RpcServer(BrowserRpcMethods(browser), protocol=BROWSER_PROTOCOL)
+
+    response = await server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "browser.mouse",
+            "params": {
+                "type": "mouseMoved",
+                "x": 123.5,
+                "y": 456.25,
+                "button": "none",
+                "buttons": 0,
+                "modifiers": 8,
+                "clickCount": 0,
+            },
+        }
+    )
+
+    assert response is not None
+    assert response.model_dump(mode="json")["result"] == {}
+    assert browser.mouse_events == [
+        {
+            "event_type": "mouseMoved",
+            "x": 123.5,
+            "y": 456.25,
+            "button": "none",
+            "buttons": 0,
+            "modifiers": 8,
+            "click_count": 0,
+        }
     ]
 
 

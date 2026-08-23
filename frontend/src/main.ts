@@ -1,5 +1,10 @@
 import "./style.css";
-import { BrowserClient, type BrowserEvent, type BrowserTab } from "./api";
+import {
+  BrowserClient,
+  type BrowserEvent,
+  type BrowserTab,
+  type MouseMoveParams,
+} from "./api";
 
 type EventPayload = Record<string, unknown>;
 
@@ -22,6 +27,9 @@ const clearLogsButton = element<HTMLButtonElement>("#clear-logs");
 let tabs: BrowserTab[] = [];
 let latestFrame: string | undefined;
 let renderingFrame = false;
+let latestMouseMove: MouseMoveParams | undefined;
+let mouseMoveFrame: number | undefined;
+let mouseMoveInFlight = false;
 
 function log(direction: "incoming" | "outgoing", name: string, payload: EventPayload = {}): void {
   const entry = document.createElement("li");
@@ -159,6 +167,34 @@ function canvasPoint(event: MouseEvent | WheelEvent): { x: number; y: number } {
   };
 }
 
+function mouseModifiers(event: MouseEvent): number {
+  return (
+    Number(event.altKey) +
+    Number(event.ctrlKey) * 2 +
+    Number(event.metaKey) * 4 +
+    Number(event.shiftKey) * 8
+  );
+}
+
+function scheduleMouseMove(params: MouseMoveParams): void {
+  latestMouseMove = params;
+  if (mouseMoveFrame !== undefined || mouseMoveInFlight) return;
+
+  mouseMoveFrame = requestAnimationFrame(() => {
+    mouseMoveFrame = undefined;
+    const next = latestMouseMove;
+    latestMouseMove = undefined;
+    if (!next) return;
+
+    mouseMoveInFlight = true;
+    log("outgoing", "browser.mouse", { type: "mouseMoved", ...next });
+    void client.mouseMove(next).catch(reportError).finally(() => {
+      mouseMoveInFlight = false;
+      if (latestMouseMove) scheduleMouseMove(latestMouseMove);
+    });
+  });
+}
+
 addressForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const value = addressInput.value.trim();
@@ -191,6 +227,20 @@ canvas.addEventListener("mouseup", (event) => {
     buttons: 0,
     clickCount: event.detail,
   }).catch(reportError);
+});
+canvas.addEventListener("mousemove", (event) => {
+  scheduleMouseMove({
+    ...canvasPoint(event),
+    buttons: event.buttons,
+    modifiers: mouseModifiers(event),
+  });
+});
+canvas.addEventListener("mouseleave", (event) => {
+  scheduleMouseMove({
+    ...canvasPoint(event),
+    buttons: event.buttons,
+    modifiers: mouseModifiers(event),
+  });
 });
 canvas.addEventListener(
   "wheel",

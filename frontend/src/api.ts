@@ -23,6 +23,20 @@ export type BrowserEvent =
   | { type: "browser.targetCrashed"; tabId: string; status: string; errorCode: number }
   | { type: "browser.targetDetached"; tabId: string | null };
 
+export type MouseButton = "none" | "left" | "middle" | "right" | "back" | "forward";
+
+export type MouseEventParams = {
+  type: "mousePressed" | "mouseReleased" | "mouseMoved";
+  x: number;
+  y: number;
+  button?: MouseButton;
+  buttons?: number;
+  modifiers?: number;
+  clickCount?: number;
+};
+
+export type MouseMoveParams = Pick<MouseEventParams, "x" | "y" | "buttons" | "modifiers">;
+
 type PendingRequest = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
@@ -65,6 +79,19 @@ export class BrowserClient {
     this.socket.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+    });
+  }
+
+  async mouse(params: MouseEventParams): Promise<void> {
+    await this.call("browser.mouse", params);
+  }
+
+  async mouseMove(params: MouseMoveParams): Promise<void> {
+    await this.mouse({
+      type: "mouseMoved",
+      button: "none",
+      clickCount: 0,
+      ...params,
     });
   }
 
