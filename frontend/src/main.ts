@@ -331,6 +331,10 @@ function mouseButton(button: number): MouseParams["button"] {
   return MOUSE_BUTTONS[button] ?? "none";
 }
 
+function heldMouseButton(): MouseParams["button"] {
+  return pressedMouseButtons.values().next().value ?? "none";
+}
+
 canvas.addEventListener("mousedown", (event) => {
   event.preventDefault();
   canvas.focus();
@@ -366,7 +370,7 @@ function forwardMouseMove(event: MouseEvent): void {
   scheduleMouseMove({
     type: "mouseMove",
     ...canvasPoint(event),
-    button: "none",
+    button: heldMouseButton(),
     buttons: event.buttons,
     modifiers: inputModifiers(event),
     clickCount: 0,

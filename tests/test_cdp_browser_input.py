@@ -37,12 +37,12 @@ def browser_with_recording_session() -> tuple[CdpBrowser, RecordingInput]:
 
 
 @pytest.mark.asyncio
-async def test_mouse_primitives_map_directly_to_cdp_events() -> None:
+async def test_mouse_primitives_preserve_the_held_button_during_a_drag() -> None:
     browser, input_domain = browser_with_recording_session()
 
     for event_type, x, y, button, buttons in (
         (MouseEventType.DOWN, 10, 20, "left", 1),
-        (MouseEventType.MOVE, 10, 80, "none", 1),
+        (MouseEventType.MOVE, 10, 80, "left", 1),
         (MouseEventType.UP, 10, 80, "left", 0),
     ):
         await browser.mouse(
@@ -64,7 +64,7 @@ async def test_mouse_primitives_map_directly_to_cdp_events() -> None:
         "type": "mouseMoved",
         "x": 10,
         "y": 80,
-        "button": "none",
+        "button": "left",
         "buttons": 1,
         "modifiers": 2,
         "click_count": 1,

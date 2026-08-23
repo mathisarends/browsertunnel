@@ -203,7 +203,7 @@ async def test_json_rpc_dispatches_generic_mouse_sequence() -> None:
                 "type": "mouseMove",
                 "x": 123.5,
                 "y": 456.25,
-                "button": "none",
+                "button": "left",
                 "buttons": 1,
             },
             {
@@ -242,7 +242,7 @@ async def test_json_rpc_dispatches_generic_mouse_sequence() -> None:
             "event_type": "mouseMove",
             "x": 123.5,
             "y": 456.25,
-            "button": "none",
+            "button": "left",
             "buttons": 1,
             "modifiers": 0,
             "click_count": 0,
