@@ -12,6 +12,7 @@ export const RpcMethod = {
   BROWSER_INPUT_KEY: "browser.input.key",
   BROWSER_INPUT_TEXT_INSERT: "browser.input.text.insert",
   BROWSER_INPUT_PASTE: "browser.input.paste",
+  BROWSER_CLIPBOARD_COPY: "browser.clipboard.copy",
   BROWSER_CLIPBOARD_READ: "browser.clipboard.read",
   BROWSER_CLIPBOARD_WRITE: "browser.clipboard.write",
   BROWSER_TAB_LIST: "browser.tab.list",

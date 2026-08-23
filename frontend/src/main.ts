@@ -14,7 +14,9 @@ type EventPayload = Record<string, unknown>;
 type HoverPoint = Pick<HoverParams, "x" | "y">;
 
 const HOVER_LOG_IDLE_MS = 250;
+const HOVER_METHOD = "browser.input.hover";
 const MAX_LOG_ENTRIES = 200;
+const KEPT_LOG_ENTRIES = 150;
 
 function element<T extends Element>(selector: string): T {
   const found = document.querySelector<T>(selector);
@@ -42,7 +44,17 @@ let hoverInFlight = false;
 let hoverLogTimer: ReturnType<typeof setTimeout> | undefined;
 let hoverLogStart: HoverPoint | undefined;
 let hoverLogEnd: HoverPoint | undefined;
+let hoverLogMoves = 0;
 let lastHoverPoint: HoverPoint | undefined;
+let lastLoggedCursor: BrowserCursor | undefined;
+
+// Erst ab MAX_LOG_ENTRIES kappen, dafür gleich auf KEPT_LOG_ENTRIES herunter,
+// damit nicht bei jedem Event ein einzelner Knoten aus dem DOM fällt.
+function pruneLog(): void {
+  if (eventLog.childElementCount <= MAX_LOG_ENTRIES) return;
+  const stale = Array.from(eventLog.children).slice(0, eventLog.childElementCount - KEPT_LOG_ENTRIES);
+  for (const entry of stale) entry.remove();
+}
 
 function log(direction: "incoming" | "outgoing", name: string, payload: EventPayload = {}): void {
   const entry = document.createElement("li");
@@ -60,9 +72,7 @@ function log(direction: "incoming" | "outgoing", name: string, payload: EventPay
   meta.append(directionLabel, eventName, timestamp);
   entry.append(meta, data);
   eventLog.append(entry);
-  while (eventLog.childElementCount > MAX_LOG_ENTRIES) {
-    eventLog.firstElementChild?.remove();
-  }
+  pruneLog();
   emptyLog.hidden = true;
   eventLog.scrollTop = eventLog.scrollHeight;
 }
@@ -162,7 +172,10 @@ function receive(event: BrowserEvent): void {
 
   if (event.type === "browser.cursor") {
     applyCursor(event.cursor);
-    log("incoming", event.type, { cursor: event.cursor });
+    if (event.cursor !== lastLoggedCursor) {
+      lastLoggedCursor = event.cursor;
+      log("incoming", event.type, { cursor: event.cursor });
+    }
     return;
   }
 
@@ -187,7 +200,8 @@ class LoggingRpcTransport implements RpcTransport {
   constructor(private readonly transport: RpcTransport) {}
 
   request<TResult>(method: string, params?: object): Promise<TResult> {
-    log("outgoing", method, (params ?? {}) as EventPayload);
+    // Hover feuert pro Frame; geloggt wird stattdessen die gesettelte Bewegung.
+    if (method !== HOVER_METHOD) log("outgoing", method, (params ?? {}) as EventPayload);
     return this.transport.request<TResult>(method, params);
   }
 
@@ -234,6 +248,7 @@ function documentHover(params: HoverParams): void {
   const point = { x: params.x, y: params.y };
   hoverLogStart ??= lastHoverPoint ?? point;
   hoverLogEnd = point;
+  hoverLogMoves += 1;
   lastHoverPoint = point;
 
   if (hoverLogTimer !== undefined) clearTimeout(hoverLogTimer);
@@ -241,12 +256,14 @@ function documentHover(params: HoverParams): void {
     hoverLogTimer = undefined;
     if (!hoverLogStart || !hoverLogEnd) return;
 
-    log("outgoing", "browser.input.hover", {
+    log("outgoing", HOVER_METHOD, {
       from: hoverLogStart,
       to: hoverLogEnd,
+      moves: hoverLogMoves,
     });
     hoverLogStart = undefined;
     hoverLogEnd = undefined;
+    hoverLogMoves = 0;
   }, HOVER_LOG_IDLE_MS);
 }
 
@@ -336,6 +353,20 @@ function isPasteShortcut(event: KeyboardEvent): boolean {
   return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "v";
 }
 
+function isCopyShortcut(event: KeyboardEvent): boolean {
+  return (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "c";
+}
+
+// Forwarding the key events alone never copies: Chrome only runs the copy
+// command when it is dispatched explicitly, and the copied text then lives in
+// the container's clipboard until we mirror it onto the viewer's.
+async function copyFromPage(): Promise<void> {
+  const { text } = await client.browser.clipboard.copy();
+  if (!text) return;
+  await navigator.clipboard.writeText(text);
+  log("incoming", "browser.clipboard.copy", { characters: text.length });
+}
+
 document.addEventListener("paste", (event) => {
   if (document.activeElement !== canvas) return;
   event.preventDefault();
@@ -348,6 +379,11 @@ document.addEventListener("paste", (event) => {
 canvas.addEventListener("keydown", (event) => {
   // Let the browser turn the shortcut into a paste event carrying the clipboard.
   if (isPasteShortcut(event)) return;
+  if (isCopyShortcut(event)) {
+    event.preventDefault();
+    void copyFromPage().catch(reportError);
+    return;
+  }
   event.preventDefault();
   const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
   if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
@@ -362,7 +398,7 @@ canvas.addEventListener("keydown", (event) => {
   }
 });
 canvas.addEventListener("keyup", (event) => {
-  if (isPasteShortcut(event)) return;
+  if (isPasteShortcut(event) || isCopyShortcut(event)) return;
   if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) return;
   const modifiers = Number(event.altKey) + Number(event.ctrlKey) * 2 + Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
   void client.browser.input.key({

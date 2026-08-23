@@ -106,6 +106,12 @@ class BrowserInputTextClient {
 class BrowserClipboardClient {
   constructor(private readonly transport: RpcTransport) {}
 
+  copy(): Promise<ClipboardResult> {
+    return this.transport.request<ClipboardResult>(
+      RpcMethod.BROWSER_CLIPBOARD_COPY,
+    );
+  }
+
   read(): Promise<ClipboardResult> {
     return this.transport.request<ClipboardResult>(
       RpcMethod.BROWSER_CLIPBOARD_READ,

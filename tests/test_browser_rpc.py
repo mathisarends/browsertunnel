@@ -15,6 +15,7 @@ class FakeBrowser(Browser):
         self.click_events: list[dict] = []
         self.hover_events: list[dict] = []
         self.pasted: list[str] = []
+        self.copies = 0
         self.tabs = [BrowserTab("tab-1", "Example", "about:blank", True)]
 
     async def start(self) -> None:
@@ -63,6 +64,10 @@ class FakeBrowser(Browser):
 
     async def paste(self, text: str) -> None:
         self.pasted.append(text)
+
+    async def copy(self) -> str:
+        self.copies += 1
+        return "copied selection"
 
     async def read_clipboard(self) -> str:
         return "clipboard"
@@ -123,6 +128,20 @@ async def test_json_rpc_pastes_viewer_clipboard_text() -> None:
     assert response is not None
     assert response.model_dump(mode="json")["result"] is None
     assert browser.pasted == ["from the local machine"]
+
+
+@pytest.mark.asyncio
+async def test_json_rpc_returns_the_pages_copied_selection() -> None:
+    browser = FakeBrowser()
+    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
+
+    response = await server.handle(
+        {"jsonrpc": "2.0", "id": 11, "method": "browser.clipboard.copy"}
+    )
+
+    assert response is not None
+    assert response.model_dump(mode="json")["result"] == {"text": "copied selection"}
+    assert browser.copies == 1
 
 
 @pytest.mark.asyncio
@@ -245,6 +264,7 @@ def test_protocol_contract_contains_methods_and_events() -> None:
         "browser.input.key",
         "browser.input.text.insert",
         "browser.input.paste",
+        "browser.clipboard.copy",
         "browser.clipboard.read",
         "browser.clipboard.write",
         "browser.tab.list",
@@ -270,6 +290,7 @@ def test_protocol_contract_contains_methods_and_events() -> None:
             "browser.nav.back",
             "browser.nav.forward",
             "browser.nav.stop",
+            "browser.clipboard.copy",
             "browser.clipboard.read",
             "browser.tab.list",
         }

@@ -10,6 +10,7 @@ from backend.presentation.rpc.models import (
 
 
 class ClipboardMethod(StrEnum):
+    COPY = "browser.clipboard.copy"
     READ = "browser.clipboard.read"
     WRITE = "browser.clipboard.write"
 
@@ -17,6 +18,10 @@ class ClipboardMethod(StrEnum):
 class ClipboardMethods(rpc.RpcHandler):
     def __init__(self, browser: Browser) -> None:
         self._browser = browser
+
+    @rpc.method(ClipboardMethod.COPY)
+    async def copy(self) -> ClipboardResult:
+        return ClipboardResult(text=await self._browser.copy())
 
     @rpc.method(ClipboardMethod.READ)
     async def read(self) -> ClipboardResult:

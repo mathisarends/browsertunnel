@@ -27,7 +27,19 @@ from backend.settings import BrowserSettings
 logger = logging.getLogger(__name__)
 
 _CONTROL_MODIFIER = 2
+_VIRTUAL_KEY_C = 67
 _VIRTUAL_KEY_V = 86
+
+_SELECTION_SOURCE = """
+() => {
+  const active = document.activeElement;
+  const start = active && "selectionStart" in active ? active.selectionStart : null;
+  if (start !== null && start !== active.selectionEnd) {
+    return active.value.slice(start, active.selectionEnd);
+  }
+  return String(document.getSelection() ?? "");
+}
+"""
 
 _COPY_SOURCE = """
 (text) => {
@@ -230,6 +242,40 @@ class CdpBrowser(Browser):
 
     async def insert_text(self, text: str) -> None:
         await self._session().input.insert_text(text=text)
+
+    async def copy(self) -> str:
+        """Run the page's own copy command and hand the copied text back.
+
+        Dispatching Ctrl+C without the editing command only delivers key events;
+        Chrome needs the explicit command to copy. The page clipboard is the
+        authoritative source afterwards, but reading it can be denied, so the
+        raw selection serves as a fallback.
+        """
+        session = self._session()
+        for event_type, commands in (("keyDown", ["copy"]), ("keyUp", None)):
+            await session.input.dispatch_key_event(
+                type=event_type,
+                key="c",
+                code="KeyC",
+                modifiers=_CONTROL_MODIFIER,
+                windows_virtual_key_code=_VIRTUAL_KEY_C,
+                commands=commands,
+            )
+        try:
+            copied = await self.read_clipboard()
+        except RuntimeError:
+            logger.debug("Clipboard read was denied; falling back to the selection")
+            copied = ""
+        return copied or await self._selection_text()
+
+    async def _selection_text(self) -> str:
+        result = await self._session().runtime.evaluate(
+            expression=f"({_SELECTION_SOURCE})()",
+            return_by_value=True,
+        )
+        if result.exception_details is not None:
+            return ""
+        return str(result.result.value or "")
 
     async def read_clipboard(self) -> str:
         result = await self._session().runtime.evaluate(

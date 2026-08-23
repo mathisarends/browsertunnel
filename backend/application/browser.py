@@ -197,6 +197,9 @@ class Browser(ABC):
     async def paste(self, text: str) -> None: ...
 
     @abstractmethod
+    async def copy(self) -> str: ...
+
+    @abstractmethod
     async def read_clipboard(self) -> str: ...
 
     @abstractmethod
