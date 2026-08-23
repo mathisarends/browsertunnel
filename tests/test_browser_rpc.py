@@ -148,14 +148,15 @@ async def test_json_rpc_dispatches_navigation_toolbar_commands() -> None:
     server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
 
     for request_id, method, params in (
-        (1, "browser.nav.back", {}),
-        (2, "browser.nav.forward", {}),
+        (1, "browser.nav.back", None),
+        (2, "browser.nav.forward", None),
         (3, "browser.nav.reload", {"ignoreCache": True}),
-        (4, "browser.nav.stop", {}),
+        (4, "browser.nav.stop", None),
     ):
-        response = await server.handle(
-            {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}
-        )
+        request = {"jsonrpc": "2.0", "id": request_id, "method": method}
+        if params is not None:
+            request["params"] = params
+        response = await server.handle(request)
         assert response is not None
         assert response.model_dump(mode="json")["result"] is None
 
@@ -260,3 +261,18 @@ def test_protocol_contract_contains_methods_and_events() -> None:
         "browser.targetDetached",
     }
     assert openrpc["openrpc"] == "1.3.2"
+
+    parameterless = {
+        method["name"]: method
+        for method in openrpc["methods"]
+        if method["name"]
+        in {
+            "browser.nav.back",
+            "browser.nav.forward",
+            "browser.nav.stop",
+            "browser.clipboard.read",
+            "browser.tab.list",
+        }
+    }
+    assert all(method["params"] == [] for method in parameterless.values())
+    assert all("x-rpc-params-schema" not in method for method in parameterless.values())

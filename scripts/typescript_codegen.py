@@ -233,7 +233,7 @@ class _Renderer:
 
     def _operation(self, operation: OperationDecl) -> str:
         params = ""
-        request_params = "{}"
+        request_params: str | None = None
         if operation.params:
             required = any(parameter.required for parameter in operation.params)
             default = "" if required else " = {}"
@@ -251,14 +251,10 @@ class _Renderer:
             lines.append("    await this.transport.request<null>(")
         else:
             lines.append(f"    return this.transport.request<{wire_result}>(")
-        lines.extend(
-            [
-                f"      RpcMethod.{operation.method_member},",
-                f"      {request_params},",
-                "    );",
-                "  }",
-            ]
-        )
+        lines.append(f"      RpcMethod.{operation.method_member},")
+        if request_params is not None:
+            lines.append(f"      {request_params},")
+        lines.extend(["    );", "  }"])
         return "\n".join(lines)
 
     def _client_model_names(self) -> set[str]:

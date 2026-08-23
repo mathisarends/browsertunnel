@@ -5,7 +5,6 @@ import pyrpckit as rpc
 from backend.application import Browser, BrowserTabNotFoundError
 from backend.presentation.rpc.models import (
     CreateTabParams,
-    EmptyParams,
     TabParams,
     TabsResult,
     tabs_result,
@@ -29,7 +28,7 @@ class TabMethods(rpc.RpcHandler):
         self._browser = browser
 
     @rpc.method(TabMethod.LIST)
-    async def list(self, _params: EmptyParams) -> TabsResult:
+    async def list(self) -> TabsResult:
         return tabs_result(await self._browser.list_tabs())
 
     @rpc.method(TabMethod.CREATE)

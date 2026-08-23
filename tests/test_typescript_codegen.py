@@ -26,6 +26,7 @@ def openrpc_document() -> dict[str, Any]:
                     }
                 ],
                 "result": {"name": "result", "schema": {"type": "null"}},
+                "x-rpc-request-schema": {"$ref": "#/components/schemas/ClickRequest"},
                 "x-rpc-params-schema": {"$ref": "#/components/schemas/ClickParams"},
             },
             {
@@ -38,11 +39,22 @@ def openrpc_document() -> dict[str, Any]:
                     }
                 ],
                 "result": {"name": "result", "schema": {"type": "string"}},
+                "x-rpc-request-schema": {"$ref": "#/components/schemas/InsertRequest"},
                 "x-rpc-params-schema": {"$ref": "#/components/schemas/TextParams"},
+            },
+            {
+                "name": "browser.tab.list",
+                "params": [],
+                "result": {
+                    "name": "result",
+                    "schema": {"type": "null"},
+                },
+                "x-rpc-request-schema": {"$ref": "#/components/schemas/ListRequest"},
             },
         ],
         "components": {
             "schemas": {
+                "ClickRequest": {"type": "object"},
                 "ClickParams": {
                     "type": "object",
                     "additionalProperties": False,
@@ -54,6 +66,8 @@ def openrpc_document() -> dict[str, Any]:
                     },
                     "required": ["button"],
                 },
+                "InsertRequest": {"type": "object"},
+                "ListRequest": {"type": "object"},
                 "TextParams": {
                     "type": "object",
                     "additionalProperties": False,
@@ -76,6 +90,8 @@ def test_renders_idiomatic_types_and_nested_namespaces() -> None:
     assert "await this.transport.request<null>" in files["client.ts"]
     assert "Object.assign(new BrowserInputClient" in files["client.ts"]
     assert "text: new BrowserInputTextClient" in files["client.ts"]
+    assert "async list(): Promise<void>" in files["client.ts"]
+    assert "RpcMethod.BROWSER_TAB_LIST,\n    );" in files["client.ts"]
 
 
 def test_check_reports_generated_files_that_are_out_of_date(tmp_path: Path) -> None:

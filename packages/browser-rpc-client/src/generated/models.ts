@@ -126,8 +126,6 @@ export const CursorStyle = {
 
 export type CursorStyle = (typeof CursorStyle)[keyof typeof CursorStyle];
 
-export type EmptyParams = Record<string, never>;
-
 export type HoverParams = {
   x: number;
   y: number;

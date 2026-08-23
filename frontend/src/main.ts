@@ -186,8 +186,8 @@ function receive(event: BrowserEvent): void {
 class LoggingRpcTransport implements RpcTransport {
   constructor(private readonly transport: RpcTransport) {}
 
-  request<TResult>(method: string, params: object): Promise<TResult> {
-    log("outgoing", method, params as EventPayload);
+  request<TResult>(method: string, params?: object): Promise<TResult> {
+    log("outgoing", method, (params ?? {}) as EventPayload);
     return this.transport.request<TResult>(method, params);
   }
 

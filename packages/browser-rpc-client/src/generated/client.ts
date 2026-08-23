@@ -30,14 +30,12 @@ class BrowserNavClient {
   async back(): Promise<void> {
     await this.transport.request<null>(
       RpcMethod.BROWSER_NAV_BACK,
-      {},
     );
   }
 
   async forward(): Promise<void> {
     await this.transport.request<null>(
       RpcMethod.BROWSER_NAV_FORWARD,
-      {},
     );
   }
 
@@ -51,7 +49,6 @@ class BrowserNavClient {
   async stop(): Promise<void> {
     await this.transport.request<null>(
       RpcMethod.BROWSER_NAV_STOP,
-      {},
     );
   }
 }
@@ -112,7 +109,6 @@ class BrowserClipboardClient {
   read(): Promise<ClipboardResult> {
     return this.transport.request<ClipboardResult>(
       RpcMethod.BROWSER_CLIPBOARD_READ,
-      {},
     );
   }
 
@@ -130,7 +126,6 @@ class BrowserTabClient {
   list(): Promise<TabsResult> {
     return this.transport.request<TabsResult>(
       RpcMethod.BROWSER_TAB_LIST,
-      {},
     );
   }
 

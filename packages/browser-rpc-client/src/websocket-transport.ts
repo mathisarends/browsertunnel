@@ -72,13 +72,19 @@ export class WebSocketRpcTransport implements RpcTransport {
     });
   }
 
-  request<TResult>(method: string, params: object): Promise<TResult> {
+  request<TResult>(method: string, params?: object): Promise<TResult> {
     if (this.socket?.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error("RPC transport is not connected"));
     }
 
     const id = this.nextId++;
-    this.socket.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
+    const request = {
+      jsonrpc: "2.0",
+      id,
+      method,
+      ...(params === undefined ? {} : { params }),
+    };
+    this.socket.send(JSON.stringify(request));
     return new Promise<TResult>((resolve, reject) => {
       this.pending.set(id, {
         resolve: (value) => resolve(value as TResult),

@@ -5,7 +5,6 @@ import pyrpckit as rpc
 from backend.application import Browser
 from backend.presentation.rpc.models import (
     ClipboardResult,
-    EmptyParams,
     TextParams,
 )
 
@@ -20,7 +19,7 @@ class ClipboardMethods(rpc.RpcHandler):
         self._browser = browser
 
     @rpc.method(ClipboardMethod.READ)
-    async def read(self, _params: EmptyParams) -> ClipboardResult:
+    async def read(self) -> ClipboardResult:
         return ClipboardResult(text=await self._browser.read_clipboard())
 
     @rpc.method(ClipboardMethod.WRITE)

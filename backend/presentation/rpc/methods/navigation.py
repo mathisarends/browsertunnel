@@ -4,7 +4,6 @@ import pyrpckit as rpc
 
 from backend.application import Browser
 from backend.presentation.rpc.models import (
-    EmptyParams,
     NavigateParams,
     ReloadParams,
 )
@@ -27,11 +26,11 @@ class NavigationMethods(rpc.RpcHandler):
         await self._browser.navigate(params.url)
 
     @rpc.method(NavigationMethod.BACK)
-    async def back(self, _params: EmptyParams) -> None:
+    async def back(self) -> None:
         await self._browser.go_back()
 
     @rpc.method(NavigationMethod.FORWARD)
-    async def forward(self, _params: EmptyParams) -> None:
+    async def forward(self) -> None:
         await self._browser.go_forward()
 
     @rpc.method(NavigationMethod.RELOAD)
@@ -39,5 +38,5 @@ class NavigationMethods(rpc.RpcHandler):
         await self._browser.reload(ignore_cache=params.ignore_cache)
 
     @rpc.method(NavigationMethod.STOP)
-    async def stop(self, _params: EmptyParams) -> None:
+    async def stop(self) -> None:
         await self._browser.stop_loading()
