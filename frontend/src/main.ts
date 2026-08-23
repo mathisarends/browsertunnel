@@ -25,6 +25,9 @@ const elements: BrowserViewElements = {
   cursorStatus: requiredElement("#cursor-status"),
   eventLog: requiredElement("#event-log"),
   emptyLog: requiredElement("#empty-log"),
+  backButton: requiredElement("#nav-back"),
+  forwardButton: requiredElement("#nav-forward"),
+  reloadButton: requiredElement("#nav-reload"),
 };
 const addressForm = requiredElement<HTMLFormElement>("#address-form");
 const newTabButton = requiredElement<HTMLButtonElement>("#new-tab");
@@ -97,6 +100,22 @@ newTabButton.addEventListener("click", () => {
       elements.addressInput.focus();
     })
     .catch(reportError);
+});
+
+elements.backButton.addEventListener("click", () => {
+  void client.browser.nav.back().catch(reportError);
+});
+
+elements.forwardButton.addEventListener("click", () => {
+  void client.browser.nav.forward().catch(reportError);
+});
+
+elements.reloadButton.addEventListener("click", () => {
+  const request =
+    elements.reloadButton.dataset.loading === "true"
+      ? client.browser.nav.stop()
+      : client.browser.nav.reload();
+  void request.catch(reportError);
 });
 
 clearLogsButton.addEventListener("click", () => view.clearLog());

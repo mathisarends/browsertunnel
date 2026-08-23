@@ -18,6 +18,9 @@ export interface BrowserViewElements {
   cursorStatus: HTMLSpanElement;
   eventLog: HTMLOListElement;
   emptyLog: HTMLParagraphElement;
+  backButton: HTMLButtonElement;
+  forwardButton: HTMLButtonElement;
+  reloadButton: HTMLButtonElement;
 }
 
 interface BrowserViewActions {
@@ -26,11 +29,18 @@ interface BrowserViewActions {
   reportError(error: unknown): void;
 }
 
+interface NavigationState {
+  canGoBack: boolean;
+  canGoForward: boolean;
+  loading: boolean;
+}
+
 export class BrowserView {
   private tabs: BrowserTab[] = [];
   private latestFrame: string | undefined;
   private renderingFrame = false;
   private lastLoggedCursor: BrowserCursor | undefined;
+  private readonly navigationByTab = new Map<string, NavigationState>();
 
   constructor(
     private readonly elements: BrowserViewElements,
@@ -79,6 +89,10 @@ export class BrowserView {
       this.elements.activeTabStatus.textContent =
         `${active.title || "Neuer Tab"} · verbunden`;
     }
+    this.applyNavigationControls(
+      active ? this.navigationByTab.get(active.id) : undefined,
+      active !== undefined,
+    );
     this.renderTabs();
   }
 
@@ -161,6 +175,12 @@ export class BrowserView {
   private applyNavigation(
     event: Extract<BrowserEvent, { type: "browser.navigation" }>,
   ): void {
+    const navigation = {
+      canGoBack: event.canGoBack,
+      canGoForward: event.canGoForward,
+      loading: event.loading,
+    };
+    this.navigationByTab.set(event.tabId, navigation);
     this.tabs = this.tabs.map((tab) =>
       tab.id === event.tabId
         ? { ...tab, title: event.title, url: event.url }
@@ -170,8 +190,23 @@ export class BrowserView {
       this.elements.addressInput.value = event.url;
       this.elements.activeTabStatus.textContent =
         `${event.title || "Neuer Tab"} · ${event.loading ? "lädt" : "verbunden"}`;
+      this.applyNavigationControls(navigation, true);
     }
     this.renderTabs();
+  }
+
+  private applyNavigationControls(
+    navigation: NavigationState | undefined,
+    hasActiveTab: boolean,
+  ): void {
+    this.elements.backButton.disabled = !navigation?.canGoBack;
+    this.elements.forwardButton.disabled = !navigation?.canGoForward;
+    this.elements.reloadButton.disabled = !hasActiveTab;
+    const loading = navigation?.loading ?? false;
+    this.elements.reloadButton.dataset.loading = String(loading);
+    this.elements.reloadButton.ariaLabel = loading
+      ? "Laden abbrechen"
+      : "Neu laden";
   }
 
   private async renderLatestFrame(): Promise<void> {

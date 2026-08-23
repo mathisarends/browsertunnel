@@ -15,10 +15,33 @@
               <span></span>
               <span></span>
             </div>
-            <div id="tab-list" class="tab-list" role="tablist" aria-label="Browser-Tabs"></div>
-            <button id="new-tab" class="new-tab" type="button" aria-label="Neuen Tab öffnen">+</button>
+            <div class="tabs">
+              <div id="tab-list" class="tab-list" role="tablist" aria-label="Browser-Tabs"></div>
+              <button id="new-tab" class="new-tab" type="button" aria-label="Neuen Tab öffnen">+</button>
+            </div>
           </div>
           <div class="browser-bar">
+            <nav class="navigation-controls" aria-label="Seitennavigation">
+              <button id="nav-back" type="button" aria-label="Zurück" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="m12.5 4.5-5.5 5 5.5 5" />
+                </svg>
+              </button>
+              <button id="nav-forward" type="button" aria-label="Vor" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="m7.5 4.5 5.5 5-5.5 5" />
+                </svg>
+              </button>
+              <button id="nav-reload" type="button" aria-label="Neu laden" data-loading="false">
+                <svg class="reload-icon" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M15.3 7.1A6 6 0 1 0 16 10" />
+                  <path d="M15.3 3.8v3.7H12" />
+                </svg>
+                <svg class="stop-icon" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M6 6h8v8H6z" />
+                </svg>
+              </button>
+            </nav>
             <form id="address-form" class="address-form">
               <label class="visually-hidden" for="address-input">URL</label>
               <input
