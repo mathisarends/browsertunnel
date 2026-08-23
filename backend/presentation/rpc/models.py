@@ -24,10 +24,6 @@ class EmptyParams(RpcModel):
     pass
 
 
-class EmptyResult(RpcModel):
-    pass
-
-
 class NavigateParams(RpcModel):
     url: str = Field(min_length=1)
 

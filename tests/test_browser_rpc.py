@@ -101,7 +101,7 @@ async def test_json_rpc_dispatches_browser_commands() -> None:
     assert response.model_dump(mode="json") == {
         "jsonrpc": "2.0",
         "id": 7,
-        "result": {},
+        "result": None,
     }
     assert browser.navigated_to == "https://example.com"
 
@@ -121,7 +121,7 @@ async def test_json_rpc_pastes_viewer_clipboard_text() -> None:
     )
 
     assert response is not None
-    assert response.model_dump(mode="json")["result"] == {}
+    assert response.model_dump(mode="json")["result"] is None
     assert browser.pasted == ["from the local machine"]
 
 
@@ -157,7 +157,7 @@ async def test_json_rpc_dispatches_navigation_toolbar_commands() -> None:
             {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}
         )
         assert response is not None
-        assert response.model_dump(mode="json")["result"] == {}
+        assert response.model_dump(mode="json")["result"] is None
 
     assert browser.navigation_commands == [
         ("back", None),
@@ -203,9 +203,9 @@ async def test_json_rpc_dispatches_separate_click_and_hover_commands() -> None:
     )
 
     assert click_response is not None
-    assert click_response.model_dump(mode="json")["result"] == {}
+    assert click_response.model_dump(mode="json")["result"] is None
     assert hover_response is not None
-    assert hover_response.model_dump(mode="json")["result"] == {}
+    assert hover_response.model_dump(mode="json")["result"] is None
     assert browser.click_events == [
         {
             "event_type": "mousePressed",

@@ -29,7 +29,7 @@ class TabMethods(rpc.RpcHandler):
         self._browser = browser
 
     @rpc.method(TabMethod.LIST)
-    async def list(self, params: EmptyParams) -> TabsResult:
+    async def list(self, _params: EmptyParams) -> TabsResult:
         return tabs_result(await self._browser.list_tabs())
 
     @rpc.method(TabMethod.CREATE)

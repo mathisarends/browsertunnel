@@ -5,7 +5,6 @@ import pyrpckit as rpc
 from backend.application import Browser
 from backend.presentation.rpc.models import (
     ClickParams,
-    EmptyResult,
     HoverParams,
     KeyParams,
     ScrollParams,
@@ -27,7 +26,7 @@ class InputMethods(rpc.RpcHandler):
         self._browser = browser
 
     @rpc.method(InputMethod.CLICK)
-    async def click(self, params: ClickParams) -> EmptyResult:
+    async def click(self, params: ClickParams) -> None:
         await self._browser.click(
             event_type=params.type,
             x=params.x,
@@ -37,30 +36,27 @@ class InputMethods(rpc.RpcHandler):
             modifiers=params.modifiers,
             click_count=params.click_count,
         )
-        return EmptyResult()
 
     @rpc.method(InputMethod.HOVER)
-    async def hover(self, params: HoverParams) -> EmptyResult:
+    async def hover(self, params: HoverParams) -> None:
         await self._browser.hover(
             x=params.x,
             y=params.y,
             buttons=params.buttons,
             modifiers=params.modifiers,
         )
-        return EmptyResult()
 
     @rpc.method(InputMethod.SCROLL)
-    async def scroll(self, params: ScrollParams) -> EmptyResult:
+    async def scroll(self, params: ScrollParams) -> None:
         await self._browser.scroll(
             x=params.x,
             y=params.y,
             delta_x=params.delta_x,
             delta_y=params.delta_y,
         )
-        return EmptyResult()
 
     @rpc.method(InputMethod.KEY)
-    async def key(self, params: KeyParams) -> EmptyResult:
+    async def key(self, params: KeyParams) -> None:
         await self._browser.key(
             event_type=params.type,
             key=params.key,
@@ -69,14 +65,11 @@ class InputMethods(rpc.RpcHandler):
             modifiers=params.modifiers,
             auto_repeat=params.auto_repeat,
         )
-        return EmptyResult()
 
     @rpc.method(InputMethod.INSERT_TEXT)
-    async def insert_text(self, params: TextParams) -> EmptyResult:
+    async def insert_text(self, params: TextParams) -> None:
         await self._browser.insert_text(params.text)
-        return EmptyResult()
 
     @rpc.method(InputMethod.PASTE)
-    async def paste(self, params: TextParams) -> EmptyResult:
+    async def paste(self, params: TextParams) -> None:
         await self._browser.paste(params.text)
-        return EmptyResult()
