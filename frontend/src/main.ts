@@ -121,7 +121,11 @@ async function renderLatestFrame(): Promise<void> {
       const binary = atob(encoded);
       const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
       const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/jpeg" }));
-      canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+      }
+      canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
       bitmap.close();
     }
   } finally {

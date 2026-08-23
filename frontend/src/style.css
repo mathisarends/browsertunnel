@@ -194,7 +194,6 @@ input {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 16 / 9;
   background: #020304;
   cursor: default;
   outline: none;
