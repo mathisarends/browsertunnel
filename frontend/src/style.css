@@ -30,7 +30,7 @@ input {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(350px, 400px);
   gap: 14px;
-  width: 100%;
+  width: min(1480px, 100%);
   height: 100vh;
   min-height: 0;
   margin-inline: auto;
@@ -319,6 +319,7 @@ input {
 .log-panel {
   display: flex;
   flex-direction: column;
+  contain: size;
   min-height: 0;
   max-height: none;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
@@ -466,6 +467,7 @@ input {
   }
 
   .log-panel {
+    contain: none;
     min-height: 360px;
     max-height: 520px;
   }
