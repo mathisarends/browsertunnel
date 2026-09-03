@@ -44,8 +44,9 @@ not part of the video stream.
 - The tab only exists on the server. Every DOM event the viewer triggers on
   the canvas is translated into a CDP input command and replayed on the real
   tab, so it looks like a real user interacting with it.
-- `backend/application` defines what a browser can do, `backend/infrastructure/cdp_browser`
-  implements that over CDP, `backend/presentation` exposes it as JSON-RPC.
+- `browsertunnel/src/browsertunnel/application` defines what a browser can do,
+  `browsertunnel/src/browsertunnel/infrastructure/cdp_browser` implements that over CDP,
+  `browsertunnel/src/browsertunnel/presentation` exposes it as JSON-RPC.
   Each layer can be swapped without touching the others.
 - One socket, both directions running at once: requests go one way, a
   notification stream (frames, tab/nav/cursor state) goes the other.
