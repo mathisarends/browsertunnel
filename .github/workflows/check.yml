@@ -20,6 +20,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: uv run --locked ruff check .
       - run: uv run --locked ruff format --check .
+      - run: uv run --locked python -m fastapi_canon.check_error_contracts browsertunnel/src --strict
       - run: uv run --locked pytest
       - run: npm run check:generated
       - run: git diff --exit-code -- packages/browser-rpc-client/src/generated
@@ -29,3 +30,4 @@ jobs:
         run: echo "BROWSER_EXECUTABLE=$(node -p "require('playwright').chromium.executablePath()")" >> "$GITHUB_ENV"
       - run: uv run --locked python -m scripts.smoke_app
       - run: npm run test:browser
+      - run: docker build -f browsertunnel/Dockerfile -t browsertunnel:check .

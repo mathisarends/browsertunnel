@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim@sha256:7cf77f594be8042dab6daa9fe326f90962252268b4f120a7f5dccce4d947e6c1
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 COPY pyproject.toml uv.lock ./
 COPY browsertunnel/pyproject.toml browsertunnel/pyproject.toml
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --locked --no-dev --no-install-workspace
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends chromium \
@@ -15,7 +15,7 @@ RUN apt-get update \
 
 COPY browsertunnel ./browsertunnel
 
-RUN uv sync --frozen --no-dev
+RUN uv sync --locked --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 

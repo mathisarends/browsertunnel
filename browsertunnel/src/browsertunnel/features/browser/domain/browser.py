@@ -57,7 +57,6 @@ class CursorStyle(StrEnum):
     ZOOM_OUT = "zoom-out"
 
     @classmethod
-    @abstractmethod
     def parse(cls, value: str) -> CursorStyle:
         """Map an untrusted page-reported cursor onto a known keyword."""
         try:

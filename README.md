@@ -141,6 +141,9 @@ shared Dishka container and closes it after the feature lifespan. RPC methods
 are free functions on `RpcChannel`, with `Inject[Browser]`; `RpcService` and the
 Dishka router own connection scopes, dispatch and event delivery. The existing
 `browser.*` wire names and `/api/browser/ws` endpoint are retained.
+Read-only tab and clipboard methods are idempotent. One RPC middleware queue
+orders mouse, keyboard and clipboard commands together; server concurrency is
+one so CDP sees that order. Generated heartbeat support detects dead connections.
 
 The frontend follows Lit Canon's `createApp` → `defineFeature` → `definePage`
 composition. A context provider owns the browser session service, and the lazy
@@ -153,7 +156,10 @@ This app has a WebSocket RPC API; an OpenAPI HTTP query generator is not needed.
 Never edit `packages/browser-rpc-client/src/generated` by hand. Regenerate with
 `npm run generate:rpc` after changing the Python contract.
 
-Direct Python/npm dependencies are exact pins; commit `uv.lock` and
+Direct Python/npm dependencies and the wheel build backend are exact pins;
+Docker's base is pinned by digest. The first image layer skips all workspace
+packages until their source has been copied.
+Commit `uv.lock` and
 `package-lock.json` together with dependency changes. The tested stack uses
 `fastapi-canon==0.8.1`, `fastapi-rpckit==0.4.1`, Lit `3.3.3`, and the Lit Canon
 Composition `0.1.0` source snapshot described in [vendor/README.md](vendor/README.md).
@@ -165,6 +171,7 @@ npm ci --ignore-scripts
 uv run --locked ruff check .
 uv run --locked ruff format --check .
 uv run --locked pytest
+uv run --locked python -m fastapi_canon.check_error_contracts browsertunnel/src --strict
 npm run check:generated
 npm run build
 uv run --locked python -m scripts.smoke_app
@@ -178,3 +185,8 @@ page disposal/reconnection. On Windows it uses installed Chrome; on Linux/macOS
 install Playwright Chromium first with `npx playwright install chromium` and set
 `BROWSER_EXECUTABLE` to its executable path if no system Chrome is available.
 CI runs the pinned installs, generated-client check, tests, build and both smokes.
+
+The HTTP error-contract checker fails on proven missing declarations. Schema
+rendering contains external calls that the static analyzer cannot fully resolve;
+these incomplete operations are reported and are not a proof of error coverage.
+The real RPC/application smokes complement that static check.
