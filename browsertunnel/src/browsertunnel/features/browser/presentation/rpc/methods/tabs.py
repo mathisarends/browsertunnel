@@ -28,7 +28,7 @@ class BrowserTabNotFound(RpcError):
     message = "Browser tab not found"
 
 
-@channel.method(TabMethod.LIST)
+@channel.method(TabMethod.LIST, idempotent=True)
 async def list(browser: Inject[Browser]) -> TabsResult:
     return tabs_result(await browser.tabs.list())
 

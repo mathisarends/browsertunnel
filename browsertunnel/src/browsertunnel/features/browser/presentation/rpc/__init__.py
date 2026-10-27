@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator
 
-from fastapi_rpckit import Inject, RpcService
+from fastapi_rpckit import Inject, RpcLimits, RpcService
 
 from browsertunnel.features.browser.domain import Browser
 
@@ -31,7 +31,12 @@ async def events(browser: Inject[Browser]) -> AsyncIterator[BrowserEvent]:
 
 
 service = RpcService(version=2)
-service.socket("/api/browser/ws", name="browser", channels=(channel,))
+service.socket(
+    "/api/browser/ws",
+    name="browser",
+    channels=(channel,),
+    limits=RpcLimits(max_concurrency=1),
+)
 BROWSER_PROTOCOL = service.protocol
 contract = service.contract(title="BrowserTunnel", base_url="ws://127.0.0.1:8000")
 

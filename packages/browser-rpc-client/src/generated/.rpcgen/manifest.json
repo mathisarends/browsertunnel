@@ -3,7 +3,7 @@
   "generatorVersion": "0.4.1",
   "layoutVersion": 10,
   "language": "typescript",
-  "contractSha256": "06d66306b4485a35ded93077e3ff169eb0dc77260ff477c87dcb159afe73b475",
+  "contractSha256": "c321bee7828b17950b88cc506645dc21570040ea62f4bad7f99443265ab00ace",
   "files": [
     ".rpcgen/manifest.json",
     "client.ts",

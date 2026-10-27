@@ -14,7 +14,6 @@ const MOUSE_BUTTONS = ["left", "middle", "right", "back", "forward"] as const;
 export class BrowserInput {
   private latestMove?: MouseParams;
   private animationFrame?: number;
-  private inputQueue: Promise<void> = Promise.resolve();
   private logTimer?: ReturnType<typeof setTimeout>;
   private logStart?: MousePoint;
   private logEnd?: MousePoint;
@@ -196,9 +195,7 @@ export class BrowserInput {
   };
 
   private enqueueMouse(params: MouseParams): void {
-    this.inputQueue = this.inputQueue
-      .then(() => this.client.browser.input.mouse(params))
-      .catch(this.reportError);
+    void this.client.browser.input.mouse(params).catch(this.reportError);
   }
 
   private documentMove(params: MouseParams): void {

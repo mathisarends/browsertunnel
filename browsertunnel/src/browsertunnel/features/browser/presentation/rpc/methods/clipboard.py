@@ -21,7 +21,7 @@ async def copy(browser: Inject[Browser]) -> ClipboardResult:
     return ClipboardResult(text=await browser.clipboard.copy())
 
 
-@channel.method(ClipboardMethod.READ)
+@channel.method(ClipboardMethod.READ, idempotent=True)
 async def read(browser: Inject[Browser]) -> ClipboardResult:
     return ClipboardResult(text=await browser.clipboard.read())
 
