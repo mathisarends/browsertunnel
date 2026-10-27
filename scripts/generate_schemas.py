@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from browsertunnel.presentation.schemas import (
+from browsertunnel.features.browser.presentation.schemas import (
     browser_json_schema,
     browser_openrpc_schema,
 )

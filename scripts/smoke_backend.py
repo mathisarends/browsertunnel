@@ -3,8 +3,8 @@
 import asyncio
 from contextlib import aclosing
 
-from browsertunnel.application import NavigationChanged
-from browsertunnel.infrastructure.cdp_browser import CdpBrowser
+from browsertunnel.features.browser.domain import NavigationChanged
+from browsertunnel.features.browser.infrastructure.cdp_browser import CdpBrowser
 from browsertunnel.settings import BrowserSettings
 
 

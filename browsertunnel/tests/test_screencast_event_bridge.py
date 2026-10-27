@@ -6,9 +6,11 @@ from typing import cast
 import pytest
 from cdpify import CDPSession
 
-from browsertunnel.application import ScreencastFrame
-from browsertunnel.infrastructure.events import EventBus
-from browsertunnel.infrastructure.screencast_event_bridge import ScreencastEventBridge
+from browsertunnel.features.browser.domain import ScreencastFrame
+from browsertunnel.features.browser.infrastructure.events import EventBus
+from browsertunnel.features.browser.infrastructure.screencast_event_bridge import (
+    ScreencastEventBridge,
+)
 
 
 class FakePage:

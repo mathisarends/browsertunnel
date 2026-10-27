@@ -1,11 +1,18 @@
 from collections.abc import AsyncIterator
 
 import pytest
-from pyrpckit import RpcServer
-from pyrpckit.schema import render_json_schema, render_openrpc
 
-from browsertunnel.application import BrowserEvent, BrowserTab, ScreencastFrame
-from browsertunnel.presentation.rpc import BROWSER_PROTOCOL, browser_rpc_methods
+from browsertunnel.features.browser.domain import (
+    Browser,
+    BrowserEvent,
+    BrowserTab,
+    ScreencastFrame,
+)
+from browsertunnel.features.browser.presentation.rpc import channel
+from browsertunnel.features.browser.presentation.schemas import (
+    browser_json_schema,
+    browser_openrpc_schema,
+)
 
 
 class FakeNavigation:
@@ -108,7 +115,7 @@ class FakeBrowser:
 @pytest.mark.asyncio
 async def test_json_rpc_dispatches_browser_commands() -> None:
     browser = FakeBrowser()
-    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
+    server = channel.create_server(context={Browser: browser})
 
     response = await server.handle(
         {
@@ -131,7 +138,7 @@ async def test_json_rpc_dispatches_browser_commands() -> None:
 @pytest.mark.asyncio
 async def test_json_rpc_pastes_viewer_clipboard_text() -> None:
     browser = FakeBrowser()
-    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
+    server = channel.create_server(context={Browser: browser})
 
     response = await server.handle(
         {
@@ -150,7 +157,7 @@ async def test_json_rpc_pastes_viewer_clipboard_text() -> None:
 @pytest.mark.asyncio
 async def test_json_rpc_returns_the_pages_copied_selection() -> None:
     browser = FakeBrowser()
-    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
+    server = channel.create_server(context={Browser: browser})
 
     response = await server.handle(
         {"jsonrpc": "2.0", "id": 11, "method": "browser.clipboard.copy"}
@@ -163,7 +170,7 @@ async def test_json_rpc_returns_the_pages_copied_selection() -> None:
 
 @pytest.mark.asyncio
 async def test_json_rpc_rejects_invalid_params() -> None:
-    server = RpcServer(*browser_rpc_methods(FakeBrowser()), protocol=BROWSER_PROTOCOL)
+    server = channel.create_server(context={Browser: FakeBrowser()})
 
     response = await server.handle(
         {
@@ -181,7 +188,7 @@ async def test_json_rpc_rejects_invalid_params() -> None:
 @pytest.mark.asyncio
 async def test_json_rpc_dispatches_navigation_toolbar_commands() -> None:
     browser = FakeBrowser()
-    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
+    server = channel.create_server(context={Browser: browser})
 
     for request_id, method, params in (
         (1, "browser.nav.back", None),
@@ -207,7 +214,7 @@ async def test_json_rpc_dispatches_navigation_toolbar_commands() -> None:
 @pytest.mark.asyncio
 async def test_json_rpc_dispatches_generic_mouse_sequence() -> None:
     browser = FakeBrowser()
-    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
+    server = channel.create_server(context={Browser: browser})
 
     for request_id, params in enumerate(
         (
@@ -282,7 +289,7 @@ async def test_json_rpc_dispatches_generic_mouse_sequence() -> None:
 @pytest.mark.asyncio
 async def test_json_rpc_dispatches_complete_special_key_data() -> None:
     browser = FakeBrowser()
-    server = RpcServer(*browser_rpc_methods(browser), protocol=BROWSER_PROTOCOL)
+    server = channel.create_server(context={Browser: browser})
 
     response = await server.handle(
         {
@@ -322,8 +329,8 @@ async def test_json_rpc_dispatches_complete_special_key_data() -> None:
 
 
 def test_protocol_contract_contains_methods_and_events() -> None:
-    schema = render_json_schema(BROWSER_PROTOCOL, title="BrowserTunnel")
-    openrpc = render_openrpc(BROWSER_PROTOCOL, title="BrowserTunnel")
+    schema = browser_json_schema()
+    openrpc = browser_openrpc_schema()
     methods = {method["name"] for method in schema["x-rpc-methods"]}
 
     assert methods == {
@@ -353,7 +360,7 @@ def test_protocol_contract_contains_methods_and_events() -> None:
         "browser.targetCrashed",
         "browser.targetDetached",
     }
-    assert openrpc["openrpc"] == "1.3.2"
+    assert openrpc["openrpc"] == "1.4.1"
     assert schema["x-rpc-protocol-version"] == 2
     assert openrpc["x-rpc-protocol-version"] == 2
 

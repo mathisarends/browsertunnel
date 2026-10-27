@@ -2,9 +2,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from browsertunnel.application import KeyEventType, MouseEventType
-from browsertunnel.infrastructure.cdp_browser import CdpClipboard, CdpInput
-from browsertunnel.infrastructure.cdp_browser.active_target import ActiveTarget
+from browsertunnel.features.browser.domain import KeyEventType, MouseEventType
+from browsertunnel.features.browser.infrastructure.cdp_browser import (
+    CdpClipboard,
+    CdpInput,
+)
+from browsertunnel.features.browser.infrastructure.cdp_browser.active_target import (
+    ActiveTarget,
+)
 
 
 class RecordingInput:

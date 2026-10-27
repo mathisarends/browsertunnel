@@ -1,17 +1,13 @@
-from dishka import make_async_container
-from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
+from fastapi_canon import Composition
 
-from browsertunnel.infrastructure.provider import BrowserProvider
-from browsertunnel.lifespan import lifespan
-from browsertunnel.presentation import SessionProvider, router
+from browsertunnel.features.browser.feature import browser_tunnel_feature
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="BrowserTunnel", version="0.1.0", lifespan=lifespan)
-    app.include_router(router)
-    setup_dishka(make_async_container(BrowserProvider(), SessionProvider()), app)
-    return app
+    return Composition(browser_tunnel_feature).apply(
+        FastAPI(title="BrowserTunnel", version="0.1.0")
+    )
 
 
 app = create_app()

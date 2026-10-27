@@ -1,0 +1,11 @@
+version = 1
+
+[contract]
+source = "browsertunnel.features.browser.presentation.rpc:contract"
+output = "schemas/openrpc.json"
+
+[[clients]]
+language = "typescript"
+output = "packages/browser-rpc-client/src/generated"
+client_name = "BrowserTunnelClient"
+with_transport = "websocket"

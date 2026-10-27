@@ -1,8 +1,8 @@
 import "./style.css";
 import {
   BrowserTunnelClient,
-  WebSocketRpcTransport,
-  type RpcTransport,
+  WebSocketTransport,
+  type RpcClientMiddleware,
 } from "@browsertunnel/browser-rpc-client";
 import { BrowserInput, MOUSE_METHOD } from "./browser-input";
 import {
@@ -37,34 +37,24 @@ let view: BrowserView;
 
 function reportError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
-  elements.activeTabStatus.textContent = `Fehler · ${message}`;
+  elements.activeTabStatus.textContent = `Fehler Â· ${message}`;
   view.log("incoming", "client.error", { message });
 }
 
-class LoggingRpcTransport implements RpcTransport {
-  constructor(private readonly transport: RpcTransport) {}
-
-  request<TResult>(method: string, params?: object): Promise<TResult> {
-    if (method !== MOUSE_METHOD) {
-      view.log("outgoing", method, (params ?? {}) as EventPayload);
+const logging: RpcClientMiddleware = {
+  request(call, next) {
+    if (call.route.method !== MOUSE_METHOD) {
+      view.log("outgoing", call.route.method, (call.params ?? {}) as EventPayload);
     }
-    return this.transport.request<TResult>(method, params);
-  }
-
-  notifications(): AsyncIterable<unknown> {
-    return this.transport.notifications();
-  }
-
-  close(): Promise<void> {
-    return this.transport.close();
-  }
-}
+    return next();
+  },
+};
 
 const socketUrl = new URL("/api/browser/ws", window.location.href);
 socketUrl.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-const socketTransport = new WebSocketRpcTransport(socketUrl);
+const socketTransport = await WebSocketTransport.open(socketUrl);
 const client = new BrowserTunnelClient(
-  new LoggingRpcTransport(socketTransport),
+  socketTransport, { middleware: [logging] },
 );
 
 view = new BrowserView(elements, {
@@ -123,8 +113,7 @@ void connect();
 
 async function connect(): Promise<void> {
   try {
-    await socketTransport.connect();
-    elements.activeTabStatus.textContent = "Backend verbunden · Stream wartet";
+    elements.activeTabStatus.textContent = "Backend verbunden Â· Stream wartet";
     void receiveNotifications().catch(reportError);
     view.applyTabs((await client.browser.tab.list()).tabs);
   } catch (error) {
@@ -133,8 +122,8 @@ async function connect(): Promise<void> {
 }
 
 async function receiveNotifications(): Promise<void> {
-  for await (const notification of client.notifications()) {
-    view.receive(notification.params);
+  for await (const event of client.browser.event()) {
+    view.receive(event);
   }
 }
 
