@@ -1,0 +1,10 @@
+{
+  "package": "lit-canon-composition",
+  "version": "0.1.0",
+  "repository": "https://github.com/mathisarends/lit-canon",
+  "revision": "4fe0827b03bacc3f04008b8300b3e6942593c323",
+  "source": "packages/composition",
+  "compiler": "typescript@6.0.3",
+  "archive": "lit-canon-composition-0.1.0-4fe0827.tgz",
+  "sha256": "741fb9f4d5cf59f3ca914fb359beb67208e5202a7811cb07e3719407f95f162b"
+}

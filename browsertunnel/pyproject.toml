@@ -4,14 +4,14 @@ version = "0.1.0"
 description = "Mirrors a real Chromium tab into a web page over CDP and JSON-RPC."
 requires-python = ">=3.14"
 dependencies = [
-    "cdpify[websocket]>=0.3.0",
-    "dishka>=1.10.1",
-    "fastapi>=0.141.1",
-    "pydantic>=2.13.4",
-    "pydantic-settings>=2.15.0",
+    "cdpify[websocket]==0.3.0",
+    "dishka==1.10.1",
+    "fastapi==0.141.1",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.15.0",
     "fastapi-canon==0.8.1",
     "fastapi-rpckit[dishka]==0.4.1",
-    "uvicorn[standard]>=0.35.0",
+    "uvicorn[standard]==0.52.4",
 ]
 
 [build-system]
