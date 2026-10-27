@@ -484,3 +484,8 @@ input {
     gap: 5px;
   }
 }
+
+lit-canon-root,
+browser-tunnel-page {
+  display: contents;
+}

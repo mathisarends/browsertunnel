@@ -26,9 +26,11 @@ export class BrowserInput {
     private readonly canvas: HTMLCanvasElement,
     private readonly client: BrowserTunnelClient,
     private readonly reportError: ReportError,
-    private readonly logMovement: (
-      payload: { from: MousePoint; to: MousePoint; moves: number },
-    ) => void,
+    private readonly logMovement: (payload: {
+      from: MousePoint;
+      to: MousePoint;
+      moves: number;
+    }) => void,
     private readonly logClipboardCopy: (characters: number) => void,
   ) {}
 
@@ -45,6 +47,25 @@ export class BrowserInput {
     window.addEventListener("mousemove", this.onWindowMouseMove);
     window.addEventListener("blur", this.releaseButtons);
     document.addEventListener("paste", this.onPaste);
+  }
+
+  detach(): void {
+    this.canvas.removeEventListener("mousedown", this.onMouseDown);
+    this.canvas.removeEventListener("mousemove", this.onCanvasMouseMove);
+    this.canvas.removeEventListener("mouseleave", this.onCanvasMouseMove);
+    this.canvas.removeEventListener("contextmenu", preventDefault);
+    this.canvas.removeEventListener("wheel", this.onWheel);
+    this.canvas.removeEventListener("keydown", this.onKeyDown);
+    this.canvas.removeEventListener("keyup", this.onKeyUp);
+    window.removeEventListener("mouseup", this.onMouseUp);
+    window.removeEventListener("mousemove", this.onWindowMouseMove);
+    window.removeEventListener("blur", this.releaseButtons);
+    document.removeEventListener("paste", this.onPaste);
+    if (this.animationFrame !== undefined)
+      cancelAnimationFrame(this.animationFrame);
+    if (this.logTimer !== undefined) clearTimeout(this.logTimer);
+    this.latestMove = undefined;
+    this.pressedButtons.clear();
   }
 
   private readonly onMouseDown = (event: MouseEvent): void => {
@@ -118,7 +139,8 @@ export class BrowserInput {
     if (document.activeElement !== this.canvas) return;
     event.preventDefault();
     const text = event.clipboardData?.getData("text/plain");
-    if (text) void this.client.browser.input.paste({ text }).catch(this.reportError);
+    if (text)
+      void this.client.browser.input.paste({ text }).catch(this.reportError);
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
@@ -130,7 +152,10 @@ export class BrowserInput {
       return;
     }
     event.preventDefault();
-    this.sendKey(event, keyText(event) === undefined ? "rawKeyDown" : "keyDown");
+    this.sendKey(
+      event,
+      keyText(event) === undefined ? "rawKeyDown" : "keyDown",
+    );
   };
 
   private readonly onKeyUp = (event: KeyboardEvent): void => {
@@ -162,7 +187,8 @@ export class BrowserInput {
   }
 
   private readonly flushMove = (): void => {
-    if (this.animationFrame !== undefined) cancelAnimationFrame(this.animationFrame);
+    if (this.animationFrame !== undefined)
+      cancelAnimationFrame(this.animationFrame);
     this.animationFrame = undefined;
     const move = this.latestMove;
     this.latestMove = undefined;
@@ -237,26 +263,67 @@ function mouseButton(button: number): MouseParams["button"] {
 }
 
 function modifiers(event: MouseEvent | KeyboardEvent): number {
-  return Number(event.altKey) + Number(event.ctrlKey) * 2 +
-    Number(event.metaKey) * 4 + Number(event.shiftKey) * 8;
+  return (
+    Number(event.altKey) +
+    Number(event.ctrlKey) * 2 +
+    Number(event.metaKey) * 4 +
+    Number(event.shiftKey) * 8
+  );
 }
 
 function isShortcut(event: KeyboardEvent, key: string): boolean {
-  return (event.ctrlKey || event.metaKey) && !event.altKey &&
-    event.key.toLowerCase() === key;
+  return (
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    event.key.toLowerCase() === key
+  );
 }
 
 const VIRTUAL_KEY: Readonly<Record<string, number>> = {
-  Backspace: 8, Tab: 9, Enter: 13, NumpadEnter: 13, ShiftLeft: 16,
-  ShiftRight: 16, ControlLeft: 17, ControlRight: 17, AltLeft: 18,
-  AltRight: 18, Pause: 19, CapsLock: 20, Escape: 27, Space: 32,
-  PageUp: 33, PageDown: 34, End: 35, Home: 36, ArrowLeft: 37,
-  ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Insert: 45, Delete: 46,
-  MetaLeft: 91, MetaRight: 92, ContextMenu: 93, NumpadMultiply: 106,
-  NumpadAdd: 107, NumpadSubtract: 109, NumpadDecimal: 110,
-  NumpadDivide: 111, NumLock: 144, ScrollLock: 145, Semicolon: 186,
-  Equal: 187, Comma: 188, Minus: 189, Period: 190, Slash: 191,
-  Backquote: 192, BracketLeft: 219, Backslash: 220, BracketRight: 221,
+  Backspace: 8,
+  Tab: 9,
+  Enter: 13,
+  NumpadEnter: 13,
+  ShiftLeft: 16,
+  ShiftRight: 16,
+  ControlLeft: 17,
+  ControlRight: 17,
+  AltLeft: 18,
+  AltRight: 18,
+  Pause: 19,
+  CapsLock: 20,
+  Escape: 27,
+  Space: 32,
+  PageUp: 33,
+  PageDown: 34,
+  End: 35,
+  Home: 36,
+  ArrowLeft: 37,
+  ArrowUp: 38,
+  ArrowRight: 39,
+  ArrowDown: 40,
+  Insert: 45,
+  Delete: 46,
+  MetaLeft: 91,
+  MetaRight: 92,
+  ContextMenu: 93,
+  NumpadMultiply: 106,
+  NumpadAdd: 107,
+  NumpadSubtract: 109,
+  NumpadDecimal: 110,
+  NumpadDivide: 111,
+  NumLock: 144,
+  ScrollLock: 145,
+  Semicolon: 186,
+  Equal: 187,
+  Comma: 188,
+  Minus: 189,
+  Period: 190,
+  Slash: 191,
+  Backquote: 192,
+  BracketLeft: 219,
+  Backslash: 220,
+  BracketRight: 221,
   Quote: 222,
 };
 
@@ -278,6 +345,7 @@ function keyText(event: KeyboardEvent): string | undefined {
   if (
     event.key.length === 1 &&
     (!hasAccelerator || event.getModifierState("AltGraph"))
-  ) return event.key;
+  )
+    return event.key;
   return undefined;
 }

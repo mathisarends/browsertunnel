@@ -39,3 +39,7 @@ Thumbs.db
 # Node / frontend
 node_modules/
 dist/
+
+# Browser smoke checks
+test-results/
+playwright-report/

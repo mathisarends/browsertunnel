@@ -12,19 +12,20 @@
     "preview": "vite preview --config frontend/vite.config.ts",
     "generate:rpc": "uv run --locked python -m scripts.generate_schemas && uv run --locked python -m scripts.generate_rpc_client",
     "check:generated": "uv run --locked python -m scripts.generate_schemas && uv run --locked python -m scripts.generate_rpc_client --check",
-    "check:client": "npm run check --workspace @browsertunnel/browser-rpc-client"
+    "check:client": "npm run check --workspace @browsertunnel/browser-rpc-client",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@browsertunnel/browser-rpc-client": "0.1.0",
-    "lit": "3.3.3",
-    "@lit/context": "1.1.6",
     "@lit-labs/router": "0.1.4",
+    "@lit/context": "1.1.6",
+    "lit": "3.3.3",
     "lit-canon-composition": "file:vendor/lit-canon-composition-0.1.0-4fe0827.tgz",
     "urlpattern-polyfill": "10.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "typescript": "5.9.3",
-    "vite": "7.3.6",
-    "@playwright/test": "1.64.1"
+    "vite": "7.3.7"
   }
 }
