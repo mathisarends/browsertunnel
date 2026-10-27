@@ -25,7 +25,7 @@ not part of the video stream.
 ```
 ┌──────────────────────┐   single WebSocket, JSON-RPC 2.0    ┌───────────────────────────┐
 │       Frontend        │ ──────────────────────────────────▶ │          Backend           │
-│  (TypeScript, Vite)   │  requests: navigate, mouse, key...  │  BrowserSession             │
+│  (Lit, Lit Canon, Vite)   │  requests: navigate, mouse, key...  │  BrowserSession             │
 │                        │ ◀────────────────────────────────  │  Browser (nav · input ·    │
 │  <canvas> viewport     │  frames, tab/nav/cursor state       │  clipboard · tabs)         │
 └────────────────────────┘                                    └─────────────┬──────────────┘
@@ -44,9 +44,9 @@ not part of the video stream.
 - The tab only exists on the server. Every DOM event the viewer triggers on
   the canvas is translated into a CDP input command and replayed on the real
   tab, so it looks like a real user interacting with it.
-- `browsertunnel/src/browsertunnel/application` defines what a browser can do,
-  `browsertunnel/src/browsertunnel/infrastructure/cdp_browser` implements that over CDP,
-  `browsertunnel/src/browsertunnel/presentation` exposes it as JSON-RPC.
+- `browsertunnel/src/browsertunnel/features/browser/domain` defines what a browser can do,
+  `browsertunnel/src/browsertunnel/features/browser/infrastructure/cdp_browser` implements that over CDP,
+  `browsertunnel/src/browsertunnel/features/browser/presentation` exposes it as JSON-RPC.
   Each layer can be swapped without touching the others.
 - One socket, both directions running at once: requests go one way, a
   notification stream (frames, tab/nav/cursor state) goes the other.
@@ -74,8 +74,8 @@ target crashed/detached.
 ## Setup
 
 ```bash
-uv sync
-npm install
+uv sync --locked
+npm ci --ignore-scripts
 uv run pre-commit install
 ```
 
@@ -92,13 +92,13 @@ sh scripts/start-frontend.sh
 
 sh scripts/generate-schemas.sh # write JSON Schema and OpenRPC into schemas/
 npm run generate:rpc # regenerate schemas and the TypeScript RPC client
-uv run pytest        # tests
-uv run ruff check .  # lint
-uv run ruff format . # format
+uv run --locked pytest        # tests
+uv run --locked ruff check .  # lint
+uv run --locked ruff format . # format
 npm run build        # type-check and build the frontend
 ```
 
-The frontend can also just be started with `npm run dev` after `npm install`.
+The frontend can also just be started with `npm run dev` after `npm ci --ignore-scripts`.
 `predev` regenerates schemas and the RPC client first. Vite hot-reloads on
 HTML/CSS/TS changes and proxies `/api` to the backend on port 8000. The
 generated client lives in the workspace package `packages/browser-rpc-client`;
@@ -130,4 +130,51 @@ Configure the browser via `BROWSER_EXECUTABLE`, `BROWSER_CDP_URL`,
 `BROWSER_SCREENCAST_QUALITY`, `BROWSER_STARTUP_TIMEOUT`. Without
 `BROWSER_CDP_URL` the backend launches Chrome/Chromium/Edge itself.
 
-Smoke test against a real browser: `uv run python -m scripts.smoke_backend`.
+Smoke test against a real browser: `uv run --locked python -m scripts.smoke_backend`.
+
+
+## Canon integration and dependency pins
+
+The backend composition root installs one explicit `browser-tunnel` feature.
+Its domain owns the browser ABCs; CDP adapters implement them. Canon owns the
+shared Dishka container and closes it after the feature lifespan. RPC methods
+are free functions on `RpcChannel`, with `Inject[Browser]`; `RpcService` and the
+Dishka router own connection scopes, dispatch and event delivery. The existing
+`browser.*` wire names and `/api/browser/ws` endpoint are retained.
+
+The frontend follows Lit Canon's `createApp` → `defineFeature` → `definePage`
+composition. A context provider owns the browser session service, and the lazy
+Lit page renders tabs, navigation, status and logs from reactive state. The
+page releases its socket, DOM listeners and pending frame/log callbacks when
+disconnected. Canvas drawing and input translation stay in browser adapters.
+This app has a WebSocket RPC API; an OpenAPI HTTP query generator is not needed.
+
+`rpcgen.toml` is the source of truth for the official RPCKit TypeScript generator.
+Never edit `packages/browser-rpc-client/src/generated` by hand. Regenerate with
+`npm run generate:rpc` after changing the Python contract.
+
+Direct Python/npm dependencies are exact pins; commit `uv.lock` and
+`package-lock.json` together with dependency changes. The tested stack uses
+`fastapi-canon==0.8.1`, `fastapi-rpckit==0.4.1`, Lit `3.3.3`, and the Lit Canon
+Composition `0.1.0` source snapshot described in [vendor/README.md](vendor/README.md).
+The snapshot is self-contained and does not require a neighboring checkout.
+
+```bash
+uv sync --locked
+npm ci --ignore-scripts
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked pytest
+npm run check:generated
+npm run build
+uv run --locked python -m scripts.smoke_app
+npm run test:browser
+```
+
+The app smoke starts a temporary local server and Chromium, exercises both schema
+endpoints, tabs, navigation, input, clipboard, pushed events and parse errors,
+then closes both. The UI smoke checks the same connection through Lit and tests
+page disposal/reconnection. On Windows it uses installed Chrome; on Linux/macOS
+install Playwright Chromium first with `npx playwright install chromium` and set
+`BROWSER_EXECUTABLE` to its executable path if no system Chrome is available.
+CI runs the pinned installs, generated-client check, tests, build and both smokes.

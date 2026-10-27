@@ -16,4 +16,4 @@ if [ ! -f .env ] && [ -f .env.example ]; then
 fi
 
 echo "Backend wird auf http://localhost:${PORT:-8000} gestartet ..."
-exec uv run python -m browsertunnel.main
+exec uv run --locked python -m browsertunnel.main

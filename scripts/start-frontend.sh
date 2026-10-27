@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 if [ ! -x node_modules/.bin/vite ]; then
   echo "Installing frontend dependencies..."
-  npm install
+  npm ci --ignore-scripts
 fi
 
 exec npm run dev

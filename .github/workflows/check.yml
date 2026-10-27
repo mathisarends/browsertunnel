@@ -1,0 +1,31 @@
+name: Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.2"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.19.0"
+          cache: npm
+      - run: uv sync --locked --python 3.14.0
+      - run: npm ci --ignore-scripts
+      - run: uv run --locked ruff check .
+      - run: uv run --locked ruff format --check .
+      - run: uv run --locked pytest
+      - run: npm run check:generated
+      - run: git diff --exit-code -- packages/browser-rpc-client/src/generated
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Select the installed Chromium for the backend
+        run: echo "BROWSER_EXECUTABLE=$(node -p "require('playwright').chromium.executablePath()")" >> "$GITHUB_ENV"
+      - run: uv run --locked python -m scripts.smoke_app
+      - run: npm run test:browser
