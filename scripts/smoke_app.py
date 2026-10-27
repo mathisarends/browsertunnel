@@ -72,6 +72,24 @@ async def main() -> None:
                     "loading", True
                 ):
                     record(json.loads(await socket.recv()))
+            # Loading completion does not guarantee the autofocus task has run.
+            # Focus the input through the same mouse RPC a viewer uses.
+            for request_id, event_type, buttons in (
+                (40, "mouseDown", 1),
+                (41, "mouseUp", 0),
+            ):
+                await call(
+                    request_id,
+                    "browser.input.mouse",
+                    {
+                        "type": event_type,
+                        "x": 20,
+                        "y": 15,
+                        "button": "left",
+                        "buttons": buttons,
+                        "clickCount": 1,
+                    },
+                )
             await call(4, "browser.input.text.insert", {"text": "Canon"})
             await call(
                 5,
